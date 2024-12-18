@@ -24,7 +24,6 @@ NAME_QUERY_ARG = "?name="
 # TXT_END
 URL_TXT_END = "/TXT"
 
-
 proxies = {
     "http": "http://localhost:7890",  # 将 "localhost" 和端口替换为你的代理服务器地址
     "https": "http://localhost:7890"
@@ -47,11 +46,11 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
         if query_arg_url:
             try_times = 10
             for i in range(try_times):
-                random_time_rest = random.randint(1, 3)
+                random_time_rest = random.randint(1, 2)
                 time.sleep(random_time_rest)
                 try:
                     # 发起GET请求
-                    response = requests.get(url,proxies=proxies)
+                    response = requests.get(url, proxies=proxies)
                     print(url)
                     # 如果请求成功且返回200
                     if response.status_code == 200:
@@ -75,12 +74,12 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
                     else:
                         print(f"Error: {response.status_code} "
                               f"Failed to retrieve data for {query_arg}")
-                        time.sleep(1)
+                        time.sleep(random_time_rest)
 
                 except requests.RequestException as e:
                     # 捕获网络请求异常，打印错误信息并等待1秒重试
                     print(f"Network error: {e}. Retrying in 1 seconds...")
-                    time.sleep(1)
+                    time.sleep(random_time_rest)
 
         return None
 

@@ -1,5 +1,5 @@
 import pandas as pd
-from data_pre import ALLCCS_PATH, TEMP_SAVE, MELTIN_PATH
+from data_pre import ALLCCS_PATH, TEMP_SAVE, MELTIN_PATH, BASE_PATH
 from data_pre.data_module import Data_reader_METLIN
 
 if __name__ == '__main__':
@@ -15,4 +15,4 @@ if __name__ == '__main__':
     # meltin_tester.can2iso_smiles_pub()
 
     # write data as csv
-    meltin_tester.data.to_csv(TEMP_SAVE + 'METLIN_iso.csv', index=False)
+    meltin_tester.data.to_csv(BASE_PATH + 'METLIN_iso.csv', index=False)

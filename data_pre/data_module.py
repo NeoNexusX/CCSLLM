@@ -1,14 +1,11 @@
+import multiprocessing
 import time
 from concurrent.futures.thread import ThreadPoolExecutor
-
+from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
 import random
-
-from multiprocess.pool import ThreadPool
-
 from .data_utils import tran_iupac2smiles_fun, tran_iso2can_rdkit, restful_pub_finder, NAME_BASE_FINDER, \
     SMILES_BASE_FINDER
-from functools import wraps
 
 
 # 读入部分数据集 作为dataframe 包含常规的预处理
@@ -52,18 +49,24 @@ class Data_reader:
                   f"each_num is {each_num}\r\n")
 
             for i in range(self.max_workers):
-                data_list.append(self.data.loc[i * each_num: (i + 1) * each_num])
+                data_list.append(self.data.iloc[i * each_num: (i + 1) * each_num])
 
             # remainder to catch the last part of the data
-            remainder = len(data_list) % self.max_workers
-            if remainder > 0:
-                data_list.append(self.data.loc[each_num * self.max_workers:])
+            remainder = len(self.data) % self.max_workers
 
-            with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+            if remainder > 0:
+                print(f"{self.data.iloc[-remainder:]}")
+                data_list.append(self.data.iloc[-remainder:])
+
+            print(f"data_list len is {len(data_list)}\r\n"
+                  f"remainder len is {remainder}\r\n")
+
+            # with ProcessPoolExecutor(max_workers=self.max_workers) as pool:
+            with ThreadPoolExecutor(max_workers=self.max_workers+1) as pool:
                 i_fun = lambda x: func(self, x)
                 futures = []
                 for data in data_list:
-                    random_time_rest = random.randint(1, 3)
+                    random_time_rest = random.randint(1, 2)
                     time.sleep(random_time_rest)
                     futures.append(pool.submit(i_fun, data))
                 # futures = [pool.submit(i_fun, data) for data in data_list]
