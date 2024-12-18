@@ -1,7 +1,14 @@
+import time
+from concurrent.futures.thread import ThreadPoolExecutor
+
 import pandas as pd
 import random
+
+from multiprocess.pool import ThreadPool
+
 from .data_utils import tran_iupac2smiles_fun, tran_iso2can_rdkit, restful_pub_finder, NAME_BASE_FINDER, \
     SMILES_BASE_FINDER
+from functools import wraps
 
 
 # 读入部分数据集 作为dataframe 包含常规的预处理
@@ -10,7 +17,7 @@ class Data_reader:
     read all kinds of database it's a basic class for you to use
     """
 
-    def __init__(self, path_list, target_colnames, fun):
+    def __init__(self, path_list, target_colnames, max_workers=16, fun=None):
         """
         init fun for building Data_reader class
 
@@ -21,10 +28,49 @@ class Data_reader:
         self.target_colnames = target_colnames
         self.path_list = path_list
         self.read_fun = fun
+        self.max_workers = max_workers
 
+        # init part
         self._read_data_list()
         self._aggregate()
         self._prepeocess()
+
+    def multithreader(func):
+        """
+        a decorator for mult itreader methods
+        """
+
+        def decorator(self, *args, **kwargs):
+
+            data_list = []
+            each_num = len(self.data) // self.max_workers
+
+            print(f"begin multitreader function:\r\n"
+                  f"self.data len is {len(self.data)}\r\n"
+                  f"func is {func.__name__}\r\n"
+                  f"max_workers is {self.max_workers}\r\n"
+                  f"each_num is {each_num}\r\n")
+
+            for i in range(self.max_workers):
+                data_list.append(self.data.loc[i * each_num: (i + 1) * each_num])
+
+            # remainder to catch the last part of the data
+            remainder = len(data_list) % self.max_workers
+            if remainder > 0:
+                data_list.append(self.data.loc[each_num * self.max_workers:])
+
+            with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+                i_fun = lambda x: func(self, x)
+                futures = []
+                for data in data_list:
+                    random_time_rest = random.randint(1, 3)
+                    time.sleep(random_time_rest)
+                    futures.append(pool.submit(i_fun, data))
+                # futures = [pool.submit(i_fun, data) for data in data_list]
+                # futures = pool.map(i_fun, data_list)
+                return futures
+
+        return decorator
 
     def _read_data_list(self):
 
@@ -62,7 +108,7 @@ class Data_reader:
         """
 
         self.data[col_name] = self.data[supply_name].apply(tran_iupac2smiles_fun)
-        self.supply_smiles(col_name, supply_name)
+        self.supply_smiles(col_name=col_name, supply_name=supply_name)
 
     def iso2can_smiles_offline(self, col_name):
 
@@ -81,7 +127,7 @@ class Data_reader:
         """
         # transformer into iso smiles 
         self.data[col_name] = self.data[col_name].apply(tran_iso2can_rdkit)
-        self.supply_smiles(col_name, supply_name)
+        self.supply_smiles(col_name=col_name, supply_name=supply_name)
 
     def supply_smiles(self, col_name='smiles', supply_name='Molecule Name', transformer=None):
 
@@ -92,10 +138,13 @@ class Data_reader:
 
         # default use Molecule Name to supply more information
         transformer = transformer if transformer else lambda x: tran_iupac2smiles_fun(x[supply_name])
+
         # add more smiles to fill the empty
         self.data.loc[self.data[col_name].isna(), col_name] = self.data.loc[self.data[col_name].isna()].apply(
             transformer, axis=1)
         self.data.dropna(axis=0, how='any', inplace=True)
+
+        return "finished"
 
     def selected_proprties(self, dict):
 
@@ -120,16 +169,19 @@ class Data_reader:
 
         return random_data_test, random_data_valid
 
-    def can2iso_smiles_pub(self, col_name='smiles', supply_name='Molecule Name', transformer=None):
+    @multithreader
+    def can2iso_smiles_pub(self, target_data, col_name='smiles', supply_name='Molecule Name', transformer=None):
 
+        print("can2iso_smiles_pub is running")
         # default use Molecule Name to supply more information
         transformer = transformer if transformer else lambda x: restful_pub_finder(x, SMILES_BASE_FINDER)
 
-        self.data[col_name] = self.data[col_name].apply(transformer)
+        target_data.loc[:, col_name] = target_data.loc[:, col_name].apply(transformer)
 
-        transformer = lambda x: restful_pub_finder(x[supply_name], NAME_BASE_FINDER)
-
-        self.supply_smiles(col_name, supply_name, transformer=transformer)
+        # transformer = lambda x: restful_pub_finder(x[supply_name], NAME_BASE_FINDER)
+        #
+        # self.supply_smiles(target_data, col_name=col_name, supply_name=supply_name, transformer=transformer)
+        print("finish can2iso_smiles_pub")
 
     def isomer_finder(self, group_name_list: list, index, supply_name, save_index=True):
 
@@ -154,7 +206,7 @@ class Data_reader:
 
         transformer = lambda x: restful_pub_finder(x[supply_name])
 
-        self.supply_smiles(group_name_list[0], supply_name, transformer)
+        self.supply_smiles(col_name=group_name_list[0], supply_name=supply_name, transformer=transformer)
 
         self.data.drop_duplicates(group_name_list, keep='first', inplace=True, ignore_index=True)
         self.data.dropna(axis=0, how='any', inplace=True)
@@ -191,10 +243,10 @@ class Data_reader_METLIN(Data_reader):
 
     """
 
-    def __init__(self, path_list, target_colnames=None, fun=None):
+    def __init__(self, path_list, target_colnames=None, max_workers=16, fun=None):
         target_colnames = target_colnames if target_colnames else ['Molecule Name', 'CCS_AVG', 'Adduct', 'Dimer.1',
                                                                    'inchi', 'smiles']
-        super().__init__(path_list, target_colnames, fun)
+        super().__init__(path_list, target_colnames, max_workers, fun)
 
 
 class Data_reader_ALLCCS(Data_reader):
@@ -223,8 +275,8 @@ class Data_reader_ALLCCS(Data_reader):
 
     """
 
-    def __init__(self, path_list, target_colnames=None, fun=None):
+    def __init__(self, path_list, target_colnames=None, max_workers=16, fun=None):
         target_colnames = target_colnames if target_colnames else ['AllCCS ID', 'Name', 'Formula', 'Type', 'Adduct',
                                                                    'm/z', 'CCS', 'Confidence level', 'Update date',
                                                                    'Structure']
-        super().__init__(path_list, target_colnames, fun)
+        super().__init__(path_list, target_colnames, max_workers, fun)

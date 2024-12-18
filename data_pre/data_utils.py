@@ -1,4 +1,5 @@
 import time
+import random
 from urllib.request import urlopen
 from urllib.parse import quote
 import urllib.parse
@@ -6,15 +7,28 @@ import requests
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
+# URL
 BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
 
-# query_arg
+# BASE_FINDER
 NAME_BASE_FINDER = "/name/property"
 SMILES_BASE_FINDER = "/smiles/property"
 
+# SMILES_RESULT
 ISOMERIC_SMILES_RESULT = "/IsomericSMILES"
-URL_TXT_END = "/TXT"
+
+# QUERY_ARG
 SMILES_QUERY_ARG = "?smiles="
+NAME_QUERY_ARG = "?name="
+
+# TXT_END
+URL_TXT_END = "/TXT"
+
+
+proxies = {
+    "http": "http://localhost:7890",  # 将 "localhost" 和端口替换为你的代理服务器地址
+    "https": "http://localhost:7890"
+}
 
 
 def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
@@ -31,11 +45,14 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
         # 构建URL
         url = BASE_URL + query_base + ISOMERIC_SMILES_RESULT + URL_TXT_END + SMILES_QUERY_ARG + f"{query_arg_url}"
         if query_arg_url:
-            while True:
+            try_times = 10
+            for i in range(try_times):
+                random_time_rest = random.randint(1, 3)
+                time.sleep(random_time_rest)
                 try:
                     # 发起GET请求
-                    response = requests.get(url)
-
+                    response = requests.get(url,proxies=proxies)
+                    print(url)
                     # 如果请求成功且返回200
                     if response.status_code == 200:
                         # 处理响应内容，提取SMILES编码
@@ -49,20 +66,23 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
                         # 返回SMILES编码
                         if '\n' in smiles_pbc:
                             smiles_pbc = None
-                        print(f"{query_arg}\r\nsmiles_pbc find :{smiles_pbc}\r\n")
+
+                        print(f"{query_arg}\r\n"
+                              f"smiles_pbc find :{smiles_pbc}\r\n")
                         return smiles_pbc
 
-                    # 如果返回的状态码不是200，打印错误并退出
+                    # 如果返回的状态码不是200，打印错误的smiles编码，线程休息1s
                     else:
-                        print(f"Error: {response.status_code} - Failed to retrieve data for {query_arg}")
-                        return None
+                        print(f"Error: {response.status_code} "
+                              f"Failed to retrieve data for {query_arg}")
+                        time.sleep(1)
 
                 except requests.RequestException as e:
-                    # 捕获网络请求异常，打印错误信息并等待2秒重试
-                    print(f"Network error: {e}. Retrying in 2 seconds...")
+                    # 捕获网络请求异常，打印错误信息并等待1秒重试
+                    print(f"Network error: {e}. Retrying in 1 seconds...")
                     time.sleep(1)
-        else:
-            return None
+
+        return None
 
 
 def tran_iupac2can_smiles_cir(compund):

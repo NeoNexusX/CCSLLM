@@ -9,8 +9,10 @@ if __name__ == '__main__':
 
     # select specific data
     meltin_tester.selected_proprties({'Dimer.1': 'Monomer'})
-    meltin_tester.iso2can_smiles_cir()
-    meltin_tester.data.info()
     meltin_tester.can2iso_smiles_pub()
+    # meltin_tester.iso2can_smiles_cir()
+    meltin_tester.data.info()
+    # meltin_tester.can2iso_smiles_pub()
+
     # write data as csv
-    meltin_tester.data.to_csv(TEMP_SAVE + 'METLIN.csv', index=False)
+    meltin_tester.data.to_csv(TEMP_SAVE + 'METLIN_iso.csv', index=False)
