@@ -1,7 +1,5 @@
-import multiprocessing
 import time
 from concurrent.futures.thread import ThreadPoolExecutor
-from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
 import random
 from .data_utils import tran_iupac2smiles_fun, tran_iso2can_rdkit, restful_pub_finder, NAME_BASE_FINDER, \

@@ -1,3 +1,4 @@
+import threading
 import time
 import random
 from urllib.request import urlopen
@@ -37,7 +38,7 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
     
     canonical_smiles : String
     """
-
+    print(f"Thread ID: {threading.current_thread().ident}")
     if query_arg:
         # 将Smiles名称进行URL编码
         query_arg_url = urllib.parse.quote(query_arg, safe='')

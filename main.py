@@ -13,6 +13,5 @@ if __name__ == '__main__':
     # meltin_tester.iso2can_smiles_cir()
     meltin_tester.data.info()
     # meltin_tester.can2iso_smiles_pub()
-
     # write data as csv
     meltin_tester.data.to_csv(BASE_PATH + 'METLIN_iso.csv', index=False)
