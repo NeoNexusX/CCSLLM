@@ -1,9 +1,10 @@
 import time
 from concurrent.futures.thread import ThreadPoolExecutor
+
 import pandas as pd
 import random
 from .data_utils import tran_iupac2smiles_fun, tran_iso2can_rdkit, restful_pub_finder, NAME_BASE_FINDER, \
-    SMILES_BASE_FINDER
+    SMILES_BASE_FINDER, tran_iupac2can_smiles_cir, restful_pub_smiles_finder
 
 
 # 读入部分数据集 作为dataframe 包含常规的预处理
@@ -12,7 +13,7 @@ class Data_reader:
     read all kinds of database it's a basic class for you to use
     """
 
-    def __init__(self, path_list, target_colnames, max_workers=16, fun=None):
+    def __init__(self, path_list, target_colnames, max_workers=32, fun=None):
         """
         init fun for building Data_reader class
 
@@ -24,12 +25,14 @@ class Data_reader:
         self.path_list = path_list
         self.read_fun = fun
         self.max_workers = max_workers
+        self.data = None
 
         # init part
         self._read_data_list()
         self._aggregate()
         self._prepeocess()
 
+    @staticmethod
     def multithreader(func):
         """
         a decorator for mult itreader methods
@@ -60,16 +63,22 @@ class Data_reader:
                   f"remainder len is {remainder}\r\n")
 
             # with ProcessPoolExecutor(max_workers=self.max_workers) as pool:
-            with ThreadPoolExecutor(max_workers=self.max_workers+1) as pool:
-                i_fun = lambda x: func(self, x)
+            with ThreadPoolExecutor(max_workers=self.max_workers + 1) as pool:
                 futures = []
+
                 for data in data_list:
                     random_time_rest = random.randint(1, 2)
                     time.sleep(random_time_rest)
-                    futures.append(pool.submit(i_fun, data))
+                    futures.append(pool.submit(func, self, data, *args, **kwargs))
                 # futures = [pool.submit(i_fun, data) for data in data_list]
                 # futures = pool.map(i_fun, data_list)
-                return futures
+
+                for future in futures:
+                    try:
+                        result = future.result()  # 获取任务结果
+                        print(f"Task result: {result}")
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
 
         return decorator
 
@@ -109,7 +118,6 @@ class Data_reader:
         """
 
         self.data[col_name] = self.data[supply_name].apply(tran_iupac2smiles_fun)
-        self.supply_smiles(col_name=col_name, supply_name=supply_name)
 
     def iso2can_smiles_offline(self, col_name):
 
@@ -120,36 +128,32 @@ class Data_reader:
 
         self.data[col_name] = self.data[col_name].apply(tran_iso2can_rdkit)
 
-    def iso2can_smiles_cir(self, col_name='smiles', supply_name='Molecule Name'):
+    def iso2can_smiles_cir(self, col_name='smiles'):
 
         """
         try to trans can to iso smiles through CDIR
         col_name : column which contain smiles  name
         """
         # transformer into iso smiles 
-        self.data[col_name] = self.data[col_name].apply(tran_iso2can_rdkit)
-        self.supply_smiles(col_name=col_name, supply_name=supply_name)
+        self.data[col_name] = self.data[col_name].apply(tran_iupac2can_smiles_cir)
 
-    def supply_smiles(self, col_name='smiles', supply_name='Molecule Name', transformer=None):
+    @multithreader
+    def supply_smiles(self, target_data, col_name='smiles', supply_name='Molecule Name', transformer=None):
 
         """
         try to fill na smiles
         col_name : column which contain smiles  name
         """
-
+        print("supply_smiles is running")
         # default use Molecule Name to supply more information
-        transformer = transformer if transformer else lambda x: tran_iupac2smiles_fun(x[supply_name])
+        func = lambda x: transformer(x[supply_name]) if transformer else lambda x: restful_pub_smiles_finder(x[supply_name])
 
         # add more smiles to fill the empty
-        self.data.loc[self.data[col_name].isna(), col_name] = self.data.loc[self.data[col_name].isna()].apply(
-            transformer, axis=1)
-        self.data.dropna(axis=0, how='any', inplace=True)
+        target_data.loc[target_data[col_name].isna(), col_name] = target_data.loc[target_data[col_name].isna()].apply(func, axis=1)
 
-        return "finished"
+    def selected_proprties(self, selected):
 
-    def selected_proprties(self, dict):
-
-        for key, value in dict.items():
+        for key, value in selected.items():
             self.data = self.data[self.data[key] == value]
             self.data = self.data.reset_index(drop=True)
         print("finish data selection work, data info :")
@@ -157,7 +161,9 @@ class Data_reader:
 
     def print_uniques(self):
         for col in self.data.columns:
-            print(f'col is {col} \r\n numbers: {len(self.data[col].unique())}types :{self.data[col].unique()}')
+            print(f'col is {col} \r\n '
+                  f'numbers: {len(self.data[col].unique())}\r\n'
+                  f'types :{self.data[col].unique()}\r\n')
 
     def random_split(self, count):
 
@@ -172,22 +178,28 @@ class Data_reader:
 
     @multithreader
     def can2iso_smiles_pub(self, target_data, col_name='smiles', supply_name='Molecule Name', transformer=None):
-
         print("can2iso_smiles_pub is running")
+        try:
+            assert col_name in target_data.columns
+            assert supply_name in target_data.columns
+        except AssertionError:
+            print(f"can2iso_smiles_pub col_name :{col_name}  or supply_name :{supply_name} is not in target_data")
+
         # default use Molecule Name to supply more information
         transformer = transformer if transformer else lambda x: restful_pub_finder(x, SMILES_BASE_FINDER)
 
         target_data.loc[:, col_name] = target_data.loc[:, col_name].apply(transformer)
 
-        # transformer = lambda x: restful_pub_finder(x[supply_name], NAME_BASE_FINDER)
-        #
-        # self.supply_smiles(target_data, col_name=col_name, supply_name=supply_name, transformer=transformer)
         print("finish can2iso_smiles_pub")
 
-    def isomer_finder(self, group_name_list: list, index, supply_name, save_index=True):
-
+    def isomer_finder(self, group_name_list: list, index, save_index=False):
+        """
+        function to find repeated smiles and set it as None
+        group_name_list ： List which column you want to group
+        index ： which ID you use to identify repeated smiles， such as ALLCCSID OR METLINID
+        """
         grouped = self.data.groupby(group_name_list)[index]
-
+        smiles_column_name = group_name_list[0]
         for group, data in grouped:
             if data.nunique() > 1:
                 print(f"Group: {group}")
@@ -197,21 +209,13 @@ class Data_reader:
         repeated_smiles = grouped.filter(lambda x: x.nunique() > 1)
 
         # choose to save data or not
-        # if save_index :
-        #     repeated_smiles.to_csv('output.csv', index=False)
+        if save_index:
+            repeated_smiles.to_csv('output.csv', index=False)
 
         # deal with all isomer data
         for idx in repeated_smiles:
             if idx in self.data[index].values:
-                self.data.loc[self.data[index] == idx, group_name_list[0]] = None
-
-        transformer = lambda x: restful_pub_finder(x[supply_name])
-
-        self.supply_smiles(col_name=group_name_list[0], supply_name=supply_name, transformer=transformer)
-
-        self.data.drop_duplicates(group_name_list, keep='first', inplace=True, ignore_index=True)
-        self.data.dropna(axis=0, how='any', inplace=True)
-        self.data.info()
+                self.data.loc[self.data[index] == idx, smiles_column_name] = None
 
         # return a series include index number
         return repeated_smiles
@@ -244,7 +248,7 @@ class Data_reader_METLIN(Data_reader):
 
     """
 
-    def __init__(self, path_list, target_colnames=None, max_workers=16, fun=None):
+    def __init__(self, path_list, target_colnames=None, max_workers=20, fun=None):
         target_colnames = target_colnames if target_colnames else ['Molecule Name', 'CCS_AVG', 'Adduct', 'Dimer.1',
                                                                    'inchi', 'smiles']
         super().__init__(path_list, target_colnames, max_workers, fun)
@@ -276,8 +280,8 @@ class Data_reader_ALLCCS(Data_reader):
 
     """
 
-    def __init__(self, path_list, target_colnames=None, max_workers=16, fun=None):
+    def __init__(self, path_list, target_colnames=None, max_workers=32, fun=None):
         target_colnames = target_colnames if target_colnames else ['AllCCS ID', 'Name', 'Formula', 'Type', 'Adduct',
-                                                                   'm/z', 'CCS', 'Confidence level', 'Update date',
+                                                                   'm/z', 'CCS', 'Confidence level',
                                                                    'Structure']
         super().__init__(path_list, target_colnames, max_workers, fun)

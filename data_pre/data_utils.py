@@ -6,7 +6,7 @@ from urllib.parse import quote
 import urllib.parse
 import requests
 from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem import rdMolDescriptors, CanonSmiles
 
 # URL
 BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
@@ -30,6 +30,18 @@ proxies = {
     "https": "http://localhost:7890"
 }
 
+# CAN OR ISO
+CANONSMILES = 1
+ISOMERICSMILES = 2
+
+
+def restful_pub_name_finder(name):
+    return restful_pub_finder(name)
+
+
+def restful_pub_smiles_finder(smiles):
+    return restful_pub_finder(smiles, SMILES_QUERY_ARG)
+
 
 def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
     """
@@ -38,7 +50,6 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
     
     canonical_smiles : String
     """
-    print(f"Thread ID: {threading.current_thread().ident}")
     if query_arg:
         # 将Smiles名称进行URL编码
         query_arg_url = urllib.parse.quote(query_arg, safe='')
@@ -52,7 +63,7 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
                 try:
                     # 发起GET请求
                     response = requests.get(url, proxies=proxies)
-                    print(url)
+
                     # 如果请求成功且返回200
                     if response.status_code == 200:
                         # 处理响应内容，提取SMILES编码
@@ -143,22 +154,25 @@ def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
         return None  # 如果SMILES无效，则返回一个全0的指纹
 
 
-def tran_iupac2smiles_fun(compound):
+def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
     """
     input iupac/smiles trans it to isomericsmiles
     
     compound : String [smiles or iupacname of the compound]
     """
-    canonical_smiles = tran_iupac2can_smiles_cir(compound) if compound else None
+    smiles = tran_iupac2can_smiles_cir(compound) if compound else None
 
     print(f'{compound}\r\n'
-          f'canonical_smiles: {canonical_smiles}\r\n')
+          f'canonical_smiles: {smiles}\r\n')
 
-    isomericsmiles = tran_iso2can_rdkit(canonical_smiles) if canonical_smiles else None
+    if smiles_type == 'CANONSMILES':
+        smiles = tran_iso2can_rdkit(smiles) if smiles else None
+    elif smiles_type == 'ISOMERICSMILES':
+        smiles = restful_pub_finder(smiles, SMILES_BASE_FINDER)
 
-    if isomericsmiles:
-        print(f"transinto smiles with :{isomericsmiles}")
+    if smiles:
+        print(f"transinto smiles with :{smiles}")
     else:
         print("get_smiles failed")
 
-    return isomericsmiles
+    return smiles
