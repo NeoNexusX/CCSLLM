@@ -6,8 +6,7 @@ from urllib.parse import quote
 import urllib.parse
 import requests
 from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors, CanonSmiles
-
+from rdkit.Chem import rdFingerprintGenerator
 # URL
 BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
 
@@ -41,6 +40,11 @@ def restful_pub_name_finder(name):
 
 def restful_pub_smiles_finder(smiles):
     return restful_pub_finder(smiles, SMILES_QUERY_ARG)
+
+
+
+# 创建 Morgan 指纹生成器，设置半径和指纹大小
+mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
 
 
 def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
@@ -136,7 +140,7 @@ def tran_iso2can_rdkit(smiles):
         return isomericsmiles
 
 
-def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
+def calculate_ecfp_rdkit(smiles):
     """
     used for calculate_ecfp
     If not calculate not finish return None else return ecfp list
@@ -148,7 +152,7 @@ def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol is not None:  # 如果SMILES字符串有效
-        ecfp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
+        ecfp = mfpgen.GetFingerprint(mol)
         return list(ecfp)  # 转换为list数组
     else:
         return None  # 如果SMILES无效，则返回一个全0的指纹
