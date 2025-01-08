@@ -162,7 +162,6 @@ def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
 
 
 def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
-def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
     """
     input iupac/smiles trans it to isomericsmiles
     
@@ -172,7 +171,6 @@ def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
     smiles = tran_iupac2can_smiles_cir(compound) if compound else None
 
     print(f'{compound}\r\n'
-          f'canonical_smiles: {smiles}\r\n')
           f'canonical_smiles: {smiles}\r\n')
 
     if smiles_type == 'CANONSMILES':

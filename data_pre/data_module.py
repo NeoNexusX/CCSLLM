@@ -39,24 +39,14 @@ def multithreader(func):
 
             # with ProcessPoolExecutor(max_workers=self.max_workers) as pool:
             with ThreadPoolExecutor(max_workers=self.max_workers + 1) as pool:
-            with ThreadPoolExecutor(max_workers=self.max_workers + 1) as pool:
                 futures = []
-
 
                 for data in data_list:
                     random_time_rest = random.randint(1, 2)
                     time.sleep(random_time_rest)
                     futures.append(pool.submit(func, self, data, *args, **kwargs))
-                    futures.append(pool.submit(func, self, data, *args, **kwargs))
                 # futures = [pool.submit(i_fun, data) for data in data_list]
                 # futures = pool.map(i_fun, data_list)
-
-                for future in futures:
-                    try:
-                        result = future.result()  # 获取任务结果
-                        print(f"Task result: {result}")
-                    except Exception as e:
-                        print(f"An error occurred: {e}")
 
                 for future in futures:
                     try:
@@ -140,7 +130,6 @@ class Data_reader:
         self.data[col_name] = self.data[col_name].apply(tran_iso2can_rdkit)
 
     def iso2can_smiles_cir(self, col_name='smiles'):
-    def iso2can_smiles_cir(self, col_name='smiles'):
 
         """
         try to trans can to iso smiles through CDIR
@@ -148,10 +137,7 @@ class Data_reader:
         """
         # transformer into iso smiles 
         self.data[col_name] = self.data[col_name].apply(tran_iupac2can_smiles_cir)
-        self.data[col_name] = self.data[col_name].apply(tran_iupac2can_smiles_cir)
 
-    @multithreader
-    def supply_smiles(self, target_data, col_name='smiles', supply_name='Molecule Name', transformer=None):
     @multithreader
     def supply_smiles(self, target_data, col_name='smiles', supply_name='Molecule Name', transformer=None):
 
@@ -172,9 +158,7 @@ class Data_reader:
             func, axis=1)
 
     def selected_proprties(self, selected):
-    def selected_proprties(self, selected):
 
-        for key, value in selected.items():
         for key, value in selected.items():
             self.data = self.data[self.data[key] == value]
             self.data = self.data.reset_index(drop=True)
@@ -322,7 +306,6 @@ class Data_reader_ALLCCS(Data_reader):
 
     """
 
-    def __init__(self, path_list, target_colnames=None, max_workers=32, fun=None):
     def __init__(self, path_list, target_colnames=None, max_workers=32, fun=None):
         target_colnames = target_colnames if target_colnames else ['AllCCS ID', 'Name', 'Formula', 'Type', 'Adduct',
                                                                    'm/z', 'CCS', 'Confidence level', 'Structure']
