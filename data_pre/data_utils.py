@@ -6,13 +6,15 @@ from urllib.parse import quote
 import urllib.parse
 import requests
 from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator
+from rdkit.Chem import rdMolDescriptors, CanonSmiles
+
 # URL
 BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
 
 # BASE_FINDER
 NAME_BASE_FINDER = "/name/property"
 SMILES_BASE_FINDER = "/smiles/property"
+INCHI_BASE_FINDER = "/inchi/property"
 
 # SMILES_RESULT
 ISOMERIC_SMILES_RESULT = "/IsomericSMILES"
@@ -20,6 +22,7 @@ ISOMERIC_SMILES_RESULT = "/IsomericSMILES"
 # QUERY_ARG
 SMILES_QUERY_ARG = "?smiles="
 NAME_QUERY_ARG = "?name="
+INCHI_QUERY_ARG = "?inchi="
 
 # TXT_END
 URL_TXT_END = "/TXT"
@@ -34,31 +37,30 @@ CANONSMILES = 1
 ISOMERICSMILES = 2
 
 
+def restful_pub_inchi_finder(inchi):
+    return restful_pub_finder(inchi, INCHI_BASE_FINDER, INCHI_QUERY_ARG)
+
+
 def restful_pub_name_finder(name):
     return restful_pub_finder(name)
 
 
 def restful_pub_smiles_finder(smiles):
-    return restful_pub_finder(smiles, SMILES_QUERY_ARG)
+    return restful_pub_finder(smiles, quary_arg=SMILES_QUERY_ARG)
 
 
-
-# 创建 Morgan 指纹生成器，设置半径和指纹大小
-mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=1024)
-
-
-def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
+def restful_pub_finder(query, query_base=NAME_BASE_FINDER, quary_arg=SMILES_QUERY_ARG):
     """
     used for converting canonical_smiles to smiles through pubchem,speed : slowly
     If not find return None else return String
     
     canonical_smiles : String
     """
-    if query_arg:
+    if query:
         # 将Smiles名称进行URL编码
-        query_arg_url = urllib.parse.quote(query_arg, safe='')
+        query_arg_url = urllib.parse.quote(query, safe='')
         # 构建URL
-        url = BASE_URL + query_base + ISOMERIC_SMILES_RESULT + URL_TXT_END + SMILES_QUERY_ARG + f"{query_arg_url}"
+        url = BASE_URL + query_base + ISOMERIC_SMILES_RESULT + URL_TXT_END + quary_arg + f"{query_arg_url}"
         if query_arg_url:
             try_times = 10
             for i in range(try_times):
@@ -68,6 +70,7 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
                     # 发起GET请求
                     response = requests.get(url, proxies=proxies)
 
+
                     # 如果请求成功且返回200
                     if response.status_code == 200:
                         # 处理响应内容，提取SMILES编码
@@ -75,21 +78,21 @@ def restful_pub_finder(query_arg, query_base=NAME_BASE_FINDER):
 
                         # 如果返回数据为空，表示没有对应数据
                         if not smiles_pbc:
-                            print(f"No SMILES data found for {query_arg}")
+                            print(f"No SMILES data found for {query}")
                             return None
 
                         # 返回SMILES编码
                         if '\n' in smiles_pbc:
                             smiles_pbc = None
 
-                        print(f"{query_arg}\r\n"
+                        print(f"{query}\r\n"
                               f"smiles_pbc find :{smiles_pbc}\r\n")
                         return smiles_pbc
 
                     # 如果返回的状态码不是200，打印错误的smiles编码，线程休息1s
                     else:
                         print(f"Error: {response.status_code} "
-                              f"Failed to retrieve data for {query_arg}")
+                              f"Failed to retrieve data for {query}")
                         time.sleep(random_time_rest)
 
                 except requests.RequestException as e:
@@ -140,7 +143,7 @@ def tran_iso2can_rdkit(smiles):
         return isomericsmiles
 
 
-def calculate_ecfp_rdkit(smiles):
+def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
     """
     used for calculate_ecfp
     If not calculate not finish return None else return ecfp list
@@ -152,12 +155,13 @@ def calculate_ecfp_rdkit(smiles):
     """
     mol = Chem.MolFromSmiles(smiles)
     if mol is not None:  # 如果SMILES字符串有效
-        ecfp = mfpgen.GetFingerprint(mol)
+        ecfp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
         return list(ecfp)  # 转换为list数组
     else:
         return None  # 如果SMILES无效，则返回一个全0的指纹
 
 
+def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
 def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
     """
     input iupac/smiles trans it to isomericsmiles
@@ -165,10 +169,16 @@ def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
     compound : String [smiles or iupacname of the compound]
     """
     smiles = tran_iupac2can_smiles_cir(compound) if compound else None
+    smiles = tran_iupac2can_smiles_cir(compound) if compound else None
 
     print(f'{compound}\r\n'
           f'canonical_smiles: {smiles}\r\n')
+          f'canonical_smiles: {smiles}\r\n')
 
+    if smiles_type == 'CANONSMILES':
+        smiles = tran_iso2can_rdkit(smiles) if smiles else None
+    elif smiles_type == 'ISOMERICSMILES':
+        smiles = restful_pub_finder(smiles, SMILES_BASE_FINDER)
     if smiles_type == 'CANONSMILES':
         smiles = tran_iso2can_rdkit(smiles) if smiles else None
     elif smiles_type == 'ISOMERICSMILES':
@@ -176,7 +186,10 @@ def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
 
     if smiles:
         print(f"transinto smiles with :{smiles}")
+    if smiles:
+        print(f"transinto smiles with :{smiles}")
     else:
         print("get_smiles failed")
 
+    return smiles
     return smiles

@@ -53,16 +53,26 @@ class CCSPredictionModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+        # self.layers = nn.Sequential(
+        #     nn.Linear(input_size, 1028),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.2),
+        #     nn.Linear(1028, 512),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.2),
+        #     nn.Linear(512, 32),
+        #     nn.ReLU(),
+        #     nn.Linear(32, 1)
+        # )
+
         self.layers = nn.Sequential(
-            nn.Linear(input_size, 1028),
-            nn.ReLU(),
+            nn.Linear(input_size, input_size),
             nn.Dropout(0.2),
-            nn.Linear(1028, 512),
             nn.ReLU(),
+            nn.Linear(input_size, input_size),
             nn.Dropout(0.2),
-            nn.Linear(512, 32),
             nn.ReLU(),
-            nn.Linear(32, 1)
+            nn.Linear(input_size, 1)
         )
 
     def forward(self, x):
@@ -155,8 +165,8 @@ def train_model(train_path, val_path, test_path, save_dir='checkpoints'):
 
 if __name__ == "__main__":
     model, trainer = train_model(
-        train_path='test_data/6/ISO_METLIN.csv',
-        val_path='test_data/6/ISO_METLIN_Valid.csv',
-        test_path='test_data/6/ISO_METLIN_Test.csv',
+        train_path='data/5/ISO_METLIN_train.csv',
+        val_path='data/5/ISO_METLIN_valid.csv',
+        test_path='data/5/ISO_METLIN_test.csv',
         save_dir='./ccs_model_checkpoints'
     )

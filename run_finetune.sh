@@ -1,0 +1,18 @@
+python main.py \
+        --device cuda \
+        --batch_size 64  \
+        --n_head 12 \
+        --n_layer 12 \
+        --n_embd 768 \
+        --d_dropout 0.2 \
+        --dropout 0.2 \
+        --lr_start 1e-5 \
+        --num_workers 20\
+        --max_epochs 1000 \
+        --num_feats 32 \
+        --checkpoint_every 2 \
+        --seed_path './Pretrained MoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt' \
+        --dataset_name ISO_METLIN \
+        --data_root ./data/5 \
+        --measure_name CCS_AVG \
+        --checkpoints_folder './checkpoints_ccs_empty'\
