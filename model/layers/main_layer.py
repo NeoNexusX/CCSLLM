@@ -20,6 +20,7 @@ def append_to_file(filename, line):
         f.write(line + "\n")
 
 
+
 class LightningModule(pl.LightningModule):
 
     def __init__(self, config, tokenizer):

@@ -30,5 +30,7 @@ class MolTranBertTokenizer(BertTokenizer):
         return split_tokens
 
     def convert_tokens_to_string(self, tokens):
+        # 忽略特殊标志
+        tokens = [token for token in tokens if token not in [self.pad_token, self.cls_token, self.sep_token]]
         out_string = "".join(tokens).strip()
         return out_string
