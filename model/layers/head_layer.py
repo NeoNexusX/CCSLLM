@@ -11,12 +11,12 @@ class Head(nn.Module):
 
         self.fc1 = nn.Linear(smiles_embed_dim, smiles_embed_dim)
         self.dropout1 = nn.Dropout(dropout)
-        self.relu1 = nn.GELU()
+        self.relu1 = nn.ReLU()
         
 
         self.fc2 = nn.Linear(smiles_embed_dim,  smiles_embed_dim)
         self.dropout2 = nn.Dropout(dropout)
-        self.relu2 = nn.GELU()
+        self.relu2 = nn.ReLU()
         
         self.final = nn.Linear(smiles_embed_dim, 512)
 

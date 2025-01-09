@@ -14,8 +14,7 @@ from fast_transformers.masking import FullMask as FL
 from functools import partial
 from sklearn.metrics import r2_score
 from .head_layer import Head
-from .aggre_layer import Aggre
-
+from .aggre_linear_layer import Aggre
 def append_to_file(filename, line):
     with open(filename, "a") as f:
         f.write(line + "\n")
@@ -74,7 +73,7 @@ class LightningModule(pl.LightningModule):
         self.loss = torch.nn.MSELoss()
         
         self.net = Head(config.n_embd, dims=config.dims, dropout=config.dropout)
-        # self.aggre = Aggre(1027)
+        self.aggre = Aggre(config.n_embd)
         
     class lm_layer(nn.Module):
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用
@@ -210,18 +209,22 @@ class LightningModule(pl.LightningModule):
         targets = batch[-1] # ccs
 
         loss = 0
-        loss_tmp = 0
 
         b, t = idx.size()
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        # x = self.aggre(None, m_z, adduct, ecfp, mask)
+        x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+        # [batch, seq_len, emb_dim]
+        masked_embedding = token_embeddings * input_mask_expanded
+        # 对 mask 进行 使用
+        sum_embeddings = torch.sum(masked_embedding, 1)
+        # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
+        
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('train_loss', loss, on_step=True)
@@ -239,17 +242,19 @@ class LightningModule(pl.LightningModule):
         targets = val_batch[-1]
 
         loss = 0
-        loss_tmp = 0
+
         b, t = idx.size()
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        # x = self.aggre(None, m_z, adduct, ecfp,mask)
+        x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+        masked_embedding = token_embeddings * input_mask_expanded
+        sum_embeddings = torch.sum(masked_embedding, 1)
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
+        
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('val_loss', loss, on_step=True)
