@@ -14,7 +14,9 @@ from fast_transformers.masking import FullMask as FL
 from functools import partial
 from sklearn.metrics import r2_score
 from .head_layer import Head
-from .aggre_linear_layer import Aggre
+import pandas as pd
+# from .aggre_linear_layer import Aggre
+from .aggre_layer import Aggre
 def append_to_file(filename, line):
     with open(filename, "a") as f:
         f.write(line + "\n")
@@ -72,9 +74,14 @@ class LightningModule(pl.LightningModule):
         self.fcs = []  
         # 默认使用了 L1 loss
         self.loss = torch.nn.MSELoss()
+        # self.loss = torch.nn.L1Loss()
         
-        self.net = Head(config.n_embd, dims=config.dims, dropout=config.dropout)
+        # self.net = Head(config.n_embd, dims=config.dims, dropout=config.dropout)
+        # self.aggre = Aggre(config.n_embd)
+        
         self.aggre = Aggre(config.n_embd)
+        self.net = Head(self.aggre.emd_size*4, dims=config.dims, dropout=config.dropout)
+        self.max_r2 = 0
         
     class lm_layer(nn.Module):
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用
@@ -215,7 +222,7 @@ class LightningModule(pl.LightningModule):
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        x = self.aggre(x, m_z, adduct, ecfp)
+        # x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         # [batch, seq_len, emb_dim]
@@ -225,7 +232,7 @@ class LightningModule(pl.LightningModule):
         # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
-        
+        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('train_loss', loss, on_step=True)
@@ -248,14 +255,14 @@ class LightningModule(pl.LightningModule):
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        x = self.aggre(x, m_z, adduct, ecfp)
+        # x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         masked_embedding = token_embeddings * input_mask_expanded
         sum_embeddings = torch.sum(masked_embedding, 1)
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
-        
+        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('val_loss', loss, on_step=True)
@@ -271,7 +278,8 @@ class LightningModule(pl.LightningModule):
         tensorboard_logs = {}
         for dataset_idx, batch_outputs in enumerate(outputs):
             dataset = self.hparams.dataset_names[dataset_idx]
-            print("x_val_loss: {}".format(batch_outputs[0]['val_loss'].item()))
+            print(f"x_{dataset}_loss: {batch_outputs[0]['val_loss'].item()}")
+            
             avg_loss = torch.stack([x["val_loss"] for x in batch_outputs]).mean()
             preds = torch.cat([x["pred"] for x in batch_outputs])
             actuals = torch.cat([x["actual"] for x in batch_outputs])
@@ -281,6 +289,20 @@ class LightningModule(pl.LightningModule):
             preds_cpu = preds.detach().cpu().numpy()
             pearson_r = pearsonr(actuals_cpu, preds_cpu)
             r2 = r2_score(actuals_cpu, preds_cpu)
+
+            if dataset=='test':
+                if r2 > self.max_r2:
+                    self.max_r2 = r2
+                    # 将数据写入 CSV
+                    data = {
+                        'true_ccs': actuals_cpu,
+                        'predicted_ccs': preds_cpu
+                    }
+                    df = pd.DataFrame(data)
+                    df.to_csv('predictions.csv', index=False)  # 保存到当前目录的 predictions.csv 文件中
+
+            print(f'r2 is {r2}')
+            
             tensorboard_logs.update(
                 {
                     # dataset + "_avg_val_loss": avg_loss,

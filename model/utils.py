@@ -4,6 +4,7 @@ import glob
 import pandas as pd
 from typing import List
 from rdkit import Chem
+import rdkit
 from regex import P
 
 

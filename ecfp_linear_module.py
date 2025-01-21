@@ -2,16 +2,18 @@ import os
 import pandas as pd
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import rdMolDescriptors
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import r2_score
-import warnings
-from data_pre.data_utils import calculate_ecfp_rdkit
 import collections
+from rdkit.Chem import rdFingerprintGenerator
+import csv
+from pathlib import Path
+from data_pre.data_utils import calculate_ecfp_rdkit
+
 
 torch.set_float32_matmul_precision('high')
 
@@ -53,27 +55,28 @@ class CCSPredictionModel(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        # self.layers = nn.Sequential(
-        #     nn.Linear(input_size, 1028),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.2),
-        #     nn.Linear(1028, 512),
-        #     nn.ReLU(),
-        #     nn.Dropout(0.2),
-        #     nn.Linear(512, 32),
-        #     nn.ReLU(),
-        #     nn.Linear(32, 1)
-        # )
-
         self.layers = nn.Sequential(
-            nn.Linear(input_size, input_size),
+            nn.Linear(input_size, 1028),
+            nn.GELU(),
             nn.Dropout(0.2),
-            nn.ReLU(),
-            nn.Linear(input_size, input_size),
+            nn.Linear(1028, 512),
+            nn.GELU(),
             nn.Dropout(0.2),
-            nn.ReLU(),
-            nn.Linear(input_size, 1)
+            nn.Linear(512, 32),
+            nn.GELU(),
+            nn.Linear(32, 1)
         )
+        self.test_results = []  # Store results for CSV
+
+        # self.layers = nn.Sequential(
+        #     nn.Linear(input_size, input_size),
+        #     nn.Dropout(0.2),
+        #     nn.ReLU(),
+        #     nn.Linear(input_size, input_size),
+        #     nn.Dropout(0.2),
+        #     nn.ReLU(),
+        #     nn.Linear(input_size, 1)
+        # )
 
     def forward(self, x):
         return self.layers(x)
@@ -99,14 +102,35 @@ class CCSPredictionModel(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x).squeeze()
+
+        #save data:
+        # Collect true and predicted values
+        true_values = y.cpu().numpy()
+        predicted_values = y_hat.detach().cpu().numpy()
+
+        # Store the results in a list for later saving
+        for true, pred in zip(true_values, predicted_values):
+            self.test_results.append({'true_ccs': true, 'predicted_ccs': pred})
+            
         loss = F.mse_loss(y_hat, y)
         r2 = r2_score(y.cpu().numpy(), y_hat.detach().cpu().numpy())
         self.log('test_loss', loss, prog_bar=True)
         self.log('test_r2', r2, prog_bar=True)
         return loss
+    
+    def on_test_epoch_end(self):
+        # Save results to a CSV file
+        output_path = Path("test_results.csv")
+        with open(output_path, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=['true_ccs', 'predicted_ccs'])
+            writer.writeheader()
+            writer.writerows(self.test_results)
+
+        print(f"Test results saved to {output_path.resolve()}")
+
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.0001)
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.00001)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-6
         )
@@ -134,7 +158,7 @@ def train_model(train_path, val_path, test_path, save_dir='checkpoints'):
     model = CCSPredictionModel(input_size=train_dataset[0][0].shape[0])
 
     trainer = pl.Trainer(
-        max_epochs=200,
+        max_epochs=300,
         accelerator='gpu',
         devices=1,
         precision=32,

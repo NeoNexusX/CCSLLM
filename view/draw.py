@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from sklearn.metrics import mean_squared_error, r2_score
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
@@ -15,20 +16,81 @@ def read_data(file_path):
         raise ValueError("file not support ,please give xlsx or csv")
     return data
 
+def calculate_statistics_torch(predicted, true):
+    # 使用 PyTorch 计算统计量
+    diff = predicted - true
+    rmse = torch.sqrt(torch.mean(diff ** 2))
+
+    ss_total = torch.sum((true - torch.mean(true)) ** 2)
+    ss_residual = torch.sum(diff ** 2)
+    r2 = 1 - ss_residual / ss_total
+
+    median_error = torch.median(torch.abs((predicted - true) / true) * 100).item()
+
+    return rmse.item(), r2.item(), median_error
 
 # 计算统计指标
 def calculate_statistics(predicted, true):
     rmse = np.sqrt(mean_squared_error(true, predicted))  # 均方根误差
+
     r2 = r2_score(true, predicted)  # 决定系数
+
     median_error = np.median(np.abs((predicted - true) / true) * 100)  # 中位相对误差（百分比）
+    
     return rmse, r2, median_error
+
+
+def plot_ccs_comparison_torch(predicted_ccs,true_ccs, fig_name):
+
+    # 计算相对误差(RE)
+    relative_error = torch.abs((predicted_ccs - true_ccs) / true_ccs) * 100  # 转为百分比
+
+    # 计算统计指标
+    rmse, r2, median_error = calculate_statistics(predicted_ccs, true_ccs)
+
+    print(rmse, r2, median_error)
+
+    # 创建颜色映射
+    norm = Normalize(vmin=0, vmax=30)  # 设置颜色映射范围
+    cmap = cm.viridis  # 使用viridis色图
+    colors = cmap(norm(relative_error.numpy()))
+
+    # 绘制散点图
+    plt.figure(figsize=(8, 8))
+    scatter = plt.scatter(predicted_ccs.numpy(), true_ccs.numpy(), c=relative_error.numpy(), cmap='viridis', s=20, alpha=0.8)
+    plt.colorbar(scatter, label='Relative Error (RE, %)')
+
+    # 添加y=x参考线
+    x = torch.linspace(predicted_ccs.min(), predicted_ccs.max(), 500)
+    plt.plot(x.numpy(), x.numpy(), 'k--', label='y = x')
+
+    # 标注统计信息
+    stats_text = (
+        f"Median Error = {median_error:.1f} %\n"
+        f"RMSE = {rmse:.3f} Å²\n"
+        f"$R^2$ = {r2:.3f}"
+    )
+    plt.text(0.05, 0.95, stats_text, transform=plt.gca().transAxes, fontsize=10, 
+             verticalalignment='top', bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
+
+    # 图形设置
+    plt.xlabel('Predicted CCS (Å²)')
+    plt.ylabel('Measured CCS (Å²)')
+    plt.title('CCS Comparison')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(fig_name)
+    plt.show()
+
+
+
 
 
 # 绘图函数
 def plot_ccs_comparison(data,fig_name):
     # 提取数据
-    predicted_ccs = data['predicted_ccs']
-    true_ccs = data['true_ccs']
+    predicted_ccs = data['predicted_ccs'].values
+    true_ccs = data['true_ccs'].values
     
     # 计算相对误差(RE)
     relative_error = np.abs((predicted_ccs - true_ccs) / true_ccs) * 100  # 转为百分比
@@ -65,5 +127,5 @@ def plot_ccs_comparison(data,fig_name):
     plt.title('CCS Comparison')
     plt.legend()
     plt.tight_layout()
-    plt.savefig(fig_name)
+    plt.savefig(f"./{fig_name}")
     plt.show()

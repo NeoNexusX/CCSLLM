@@ -57,7 +57,7 @@ def main():
     r2_checkpoint_callback =  pl.callbacks.ModelCheckpoint(
         monitor="CCS_AVG_test_r2",
         mode="max",
-        save_top_k=2,
+        save_top_k=5,
         filename="best-model-{epoch:02d}-{CCS_AVG_test_r2:.4f}"
     )
 

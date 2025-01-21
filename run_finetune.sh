@@ -4,9 +4,9 @@ python main.py \
         --n_head 12 \
         --n_layer 12 \
         --n_embd 768 \
-        --d_dropout 0.3 \
-        --dropout 0.3 \
-        --lr_start 1e-7 \
+        --d_dropout 0.0 \
+        --dropout 0.0 \
+        --lr_start 1e-5 \
         --num_workers 20\
         --max_epochs 1000 \
         --num_feats 32 \

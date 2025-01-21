@@ -7,6 +7,13 @@ import urllib.parse
 import requests
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors, CanonSmiles
+from rdkit.Chem import rdFingerprintGenerator
+
+
+# calculate_ecfp_rdkit auto fit new version
+RDKIT_RADIUS=2
+RDKIT_N_BITS=1024
+morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=RDKIT_RADIUS,fpSize=RDKIT_N_BITS)
 
 # URL
 BASE_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound"
@@ -35,6 +42,7 @@ proxies = {
 # CAN OR ISO
 CANONSMILES = 1
 ISOMERICSMILES = 2
+    
 
 
 def restful_pub_inchi_finder(inchi):
@@ -143,22 +151,22 @@ def tran_iso2can_rdkit(smiles):
         return isomericsmiles
 
 
-def calculate_ecfp_rdkit(smiles, radius=2, n_bits=1024):
+def calculate_ecfp_rdkit(smiles):
     """
-    used for calculate_ecfp
-    If not calculate not finish return None else return ecfp list
+    Used for calculating ECFP.
+    If calculation fails, return None; otherwise, return ECFP list.
 
-    smiles : String [smiles of the compound]
-    radius: int  (default : 2)
-    n_bits : int [size of calculation] (default :1024)
-
+    smiles : String [SMILES of the compound]
+    radius: int (default: 2)
+    n_bits: int [size of calculation] (default: 1024)
     """
     mol = Chem.MolFromSmiles(smiles)
-    if mol is not None:  # 如果SMILES字符串有效
-        ecfp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
-        return list(ecfp)  # 转换为list数组
+    if mol is not None:  # If the SMILES string is valid
+        # Initialize MorganGenerator with the specified parameters
+        ecfp = morgan_gen.GetFingerprint(mol)
+        return list(ecfp)  # Convert to list array
     else:
-        return None  # 如果SMILES无效，则返回一个全0的指纹
+        return None  # If SMILES is invalid, return None
 
 
 def tran_iupac2smiles_fun(compound, smiles_type='CANONSMILES'):
