@@ -19,15 +19,20 @@ class Aggre(nn.Module):
         # m/z    [batch]
         # adduct [batch]
         # ecfp   [batch, ecfp_length]
+
         adduct = self.adduct_emb(adduct)
         # adduct: [batch,1]
+
         ecfp = self.ecfp_emb(ecfp)
         # [batch_size, 1]
-        # [batch_size, 1]
+
         m_z = m_z.unsqueeze(1).repeat(1,self.emd_size)
         # [batch_size, 1]
+
         sum_embedding = self.sum_embedding(sum_embedding)
         # 汇聚堆叠在一起
+        
+        print()
         cat = torch.cat((sum_embedding,ecfp,adduct,m_z),dim=1)
 
         return cat

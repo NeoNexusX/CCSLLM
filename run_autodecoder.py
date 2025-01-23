@@ -1,16 +1,13 @@
 
-from torch.utils.data import DataLoader, TensorDataset
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import pytorch_lightning as pl
-# from data_pre.data_loader import calculate_ecfp
-from rdkit import Chem
 from model.autodecoder import Autoencoder,train_predict_autodecoer
 from rdkit.Chem import rdFingerprintGenerator
 from data_pre.data_utils import calculate_ecfp_rdkit
-from predict_draw import prepare_llm_data
+from llm_predict import prepare_llm_data
 
 
 def prepare_ecfp_data():

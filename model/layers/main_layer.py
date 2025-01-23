@@ -82,6 +82,40 @@ class LightningModule(pl.LightningModule):
         self.aggre = Aggre(config.n_embd)
         self.net = Head(self.aggre.emd_size*4, dims=config.dims, dropout=config.dropout)
         self.max_r2 = 0
+
+    def forward(self, data):
+
+        idx_size = 70
+        mask_size = 70 + idx_size
+        mz_size = 1 + mask_size
+        adduct_size = 1 + mz_size
+        ecfp_size =1024 + adduct_size
+
+        device = 'cuda'
+        # 确保 data 是一个 numpy 数组，然后将其转化为 torch 张量
+        print("predict is running")
+        data = torch.tensor(data, dtype=torch.float32).to(device)
+
+        idx = data[:,:idx_size].long()
+        mask = data[:,idx_size:mask_size]
+        m_z = data[:,mask_size:mz_size].squeeze(-1)
+        adduct = data[:,mz_size:adduct_size].squeeze(-1).long()
+        ecfp = data[:,adduct_size:ecfp_size]
+        # idx, mask, m_z, adduct, ecfp,_ = [x.to(device) for x in data]
+
+        x = self.tok_emb(idx)
+        x = self.blocks(x)
+        # x = model.aggre(x, m_z, adduct, ecfp)
+
+        input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
+        masked_embedding = x * input_mask_expanded
+        sum_embeddings = torch.sum(masked_embedding, 1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-8)
+        loss_input = sum_embeddings / sum_mask
+        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)   
+        pred = self.net(loss_input)
+
+        return pred.cpu()
         
     class lm_layer(nn.Module):
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用

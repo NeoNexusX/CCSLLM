@@ -1,9 +1,6 @@
 import yaml
 import torch
 import pandas as pd
-import numpy as np
-import pytorch_lightning as pl
-import matplotlib.pyplot as plt
 from fast_transformers.masking import LengthMask as LM
 from argparse import Namespace
 from data_pre.tokenizer import MolTranBertTokenizer
@@ -11,7 +8,7 @@ from model.layers.main_layer import LightningModule
 from data_pre.data_loader import PropertyPredictionDataModule
 from view.draw import plot_ccs_comparison
 from model.autodecoder import Autoencoder,train_predict_autodecoer
-
+from fast_transformers.masking import LengthMask as LM
 
 def predict (data_loader,model,predictions,truths,smiles_list,mz_list,tokenizer,device='cuda'):
 
@@ -32,7 +29,7 @@ def predict (data_loader,model,predictions,truths,smiles_list,mz_list,tokenizer,
             # 模型前向传播
             token_embeddings = model.tok_emb(idx)
             x = model.drop(token_embeddings)
-            x = model.blocks(x)
+            x = model.blocks(x, length_mask=LM(mask.sum(-1)))
             # x = model.aggre(x, m_z, adduct, ecfp)
 
             # Mask处理
