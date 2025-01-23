@@ -115,7 +115,7 @@ class LightningModule(pl.LightningModule):
         loss_input = self.aggre(loss_input, m_z, adduct, ecfp)   
         pred = self.net(loss_input)
 
-        return pred.cpu()
+        return pred.cpu().detach().numpy()
         
     class lm_layer(nn.Module):
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用
