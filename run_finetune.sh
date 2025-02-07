@@ -15,4 +15,4 @@ python main.py \
         --dataset_name ISO_METLIN \
         --data_root ./data/5 \
         --measure_name CCS_AVG \
-        --checkpoints_folder './checkpoints_ccs_empty'\
+        --checkpoints_folder './ccs_linear'\

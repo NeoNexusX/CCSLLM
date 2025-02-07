@@ -32,7 +32,6 @@ class Aggre(nn.Module):
         sum_embedding = self.sum_embedding(sum_embedding)
         # 汇聚堆叠在一起
         
-        print()
         cat = torch.cat((sum_embedding,ecfp,adduct,m_z),dim=1)
 
         return cat

@@ -29,6 +29,7 @@ class PropertyPredictionDataset(torch.utils.data.Dataset):
         df.info()
 
         # mz 
+        df['m/z'] = df['m/z'] / 1e3
         self.mz = df['m/z'].tolist()
 
         # adduct
