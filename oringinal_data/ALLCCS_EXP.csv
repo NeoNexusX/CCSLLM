@@ -1,4 +1,4 @@
-Adduct,m/z,CCS(Å2),Charge,Instrument,Type,Approach,Calibrant,DOI,Update date,ID
+Adduct,m/z,CCS,Charge,Instrument,Type,Approach,Calibrant,DOI,Update date,ID
 [M+NH4]+,612.5562,263.8,1,Bruker timsTOF Pro,TIMS,Empirical method,ESI Low Concentration Tuning Mix (Agilent),https://doi.org/doi.org/10.1016/j.aca.2022.339886,2022-10-12,AllCCS00103234
 [M+NH4]+,860.7702,315.2,1,Bruker timsTOF Pro,TIMS,Empirical method,ESI Low Concentration Tuning Mix (Agilent),https://doi.org/doi.org/10.1016/j.aca.2022.339886,2022-10-12,AllCCS00103540
 [M+NH4]+,990.9424,344.8,1,Bruker timsTOF Pro,TIMS,Empirical method,ESI Low Concentration Tuning Mix (Agilent),https://doi.org/doi.org/10.1016/j.aca.2022.339886,2022-10-12,AllCCS00104700

@@ -1,8 +1,10 @@
 from data_pre import data_module
 
-BASE_PATH = './oringinal_data'
+ORINGINAL_BASE_PATH = './oringinal_data'
+RESULTS_BASE_PATH = './results'
 TEMP_SAVE = './data'
 # ALLCCS_PATH = [BASE_PATH + r"/AllCCS download" + rf' ({i}).csv' for i in range(43)]
-ALLCCS_PATH = [BASE_PATH + '/ALLCCS.csv']
-MELTIN_PATH = [BASE_PATH + '/METLIN_IMS_rmTM.csv']
-Final_MELTIN_PATH = [BASE_PATH + '/MZ_ISO_METLIN.csv']
+ALLCCS_PATH = [ORINGINAL_BASE_PATH + '/ALLCCS_ISO.csv']
+ALLCCS_EXP_PATH = [ORINGINAL_BASE_PATH + '/ALLCCS_EXP.csv']
+MELTIN_PATH = [ORINGINAL_BASE_PATH + '/METLIN_IMS_rmTM.csv']
+Final_MELTIN_PATH = [ORINGINAL_BASE_PATH + '/MZ_ISO_METLIN.csv']
