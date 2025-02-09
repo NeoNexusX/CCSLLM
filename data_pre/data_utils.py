@@ -35,8 +35,8 @@ INCHI_QUERY_ARG = "?inchi="
 URL_TXT_END = "/TXT"
 
 proxies = {
-    "http": "http://localhost:7890",  # 将 "localhost" 和端口替换为你的代理服务器地址
-    "https": "http://localhost:7890"
+    "http": "http://localhost:11120",  # 将 "localhost" 和端口替换为你的代理服务器地址
+    "https": "http://localhost:11120"
 }
 
 # CAN OR ISO
@@ -76,7 +76,7 @@ def restful_pub_finder(query, query_base=NAME_BASE_FINDER, quary_arg=SMILES_QUER
                 time.sleep(random_time_rest)
                 try:
                     # 发起GET请求
-                    response = requests.get(url, proxies=proxies)
+                    response = requests.get(url)
 
 
                     # 如果请求成功且返回200

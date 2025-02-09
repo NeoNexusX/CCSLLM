@@ -170,9 +170,6 @@ class Data_reader:
             print(f'col is {col} \r\n '
                   f'numbers: {len(self.data[col].unique())}\r\n'
                   f'types :{self.data[col].unique()}\r\n')
-            print(f'col is {col} \r\n '
-                  f'numbers: {len(self.data[col].unique())}\r\n'
-                  f'types :{self.data[col].unique()}\r\n')
 
     def random_split(self, count):
 
