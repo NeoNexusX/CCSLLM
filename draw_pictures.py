@@ -7,7 +7,7 @@ if __name__ == '__main__':
     test_name = 'test'
     # 加载对比的 DataFrame
     
-    results_df = pd.read_csv('test_results.csv')  # 需要比较的文件
+    results_df = pd.read_csv('./results/test_results.csv')  # 需要比较的文件
     # results_df = pd.read_csv('predictions.csv')  # 需要比较的文件
 
     try:

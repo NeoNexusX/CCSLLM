@@ -12,7 +12,7 @@ python main.py \
         --num_feats 32 \
         --checkpoint_every 2 \
         --seed_path './Pretrained MoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt' \
-        --dataset_name ISO_METLIN \
+        --dataset_name FINAL_DATA \
         --data_root ./data/5 \
-        --measure_name CCS_AVG \
+        --measure_name CCS \
         --checkpoints_folder './ccs_linear'\

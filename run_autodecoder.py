@@ -43,4 +43,4 @@ if __name__ == '__main__':
     train_ecfs,test_ecfs,_,_,_,_ = prepare_llm_data(model_name)
 
 
-    train_predict_autodecoer(test_ecfs,train_ecfs,unit_name = 'linear')
+    train_predict_autodecoer(test_ecfs,train_ecfs,unit_name='llm')

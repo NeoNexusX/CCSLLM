@@ -56,7 +56,7 @@ class Autoencoder(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-6)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-6
+            optimizer, mode='min', factor=0.1, patience=5, min_lr=1e-7
         )
         return {
             "optimizer": optimizer,
@@ -68,54 +68,56 @@ class Autoencoder(pl.LightningModule):
 
 
 
-def train_predict_autodecoer(test_emb,train_emb,unit_name=''):
-    
+def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
+
+    # set pl.__version__
     print(f'pl version is : {pl.__version__}')
     if pl.__version__ == '1.1.5':
         pass
     else:
         torch.set_float32_matmul_precision('high')
 
+    # set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # test_dataset = TensorDataset(test_emb)
-    # train_dataset = TensorDataset(train_emb)
-
+    # concat test and train
     all_emb = torch.cat((test_emb,train_emb),dim=0)
     all_dataset = TensorDataset(all_emb)
     
-    # dataloader
-    num_workers = 32 if all_emb.device == 'cpu' else 0 
+    # dataloader threads number for differnet version
+    num_workers = 64 if all_emb.device == 'cpu' else 0 
     all_dataloader= DataLoader(all_dataset, batch_size=64, shuffle=False,num_workers=num_workers)
     
+    # build a model
     autoencoder = Autoencoder(input_dim =test_emb.shape[1],latent_dim=2,mode=unit_name)
 
     save_dir = './autodecoder_emb'
 
+    # build a trainer
     trainer = pl.Trainer(
-        max_epochs=2,
+        max_epochs=100,
         gpus=1,
         callbacks=[
             pl.callbacks.EarlyStopping(
                 monitor='train_loss',
-                patience=30,
+                patience=20,
                 mode='min'
             ),
             pl.callbacks.LearningRateMonitor(logging_interval='epoch')
         ],
-        log_every_n_steps=10,
+        log_every_n_steps=1,
         logger=pl.loggers.TensorBoardLogger(save_dir, name='ecfp_logs')
     )
 
     # fit  指定数据集
     trainer.fit(autoencoder, all_dataloader)
-    # fit 指定test数据集？
 
-
+    # set for eval mode
     autoencoder.eval()
     autoencoder = autoencoder.to(device)
 
     with torch.no_grad():
+        # calculate emb
         test_emb = test_emb.to(device)
         train_emb = train_emb.to(device)
         encoded_train = autoencoder.encoder(train_emb).cpu().numpy()
@@ -128,19 +130,19 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name=''):
         average_distances = distances.mean(axis=1)
         avg_dist = average_distances.mean()
         print(f'average_distances :{average_distances.mean()}')
-
-    plt.figure(figsize=(10, 7))
-    plt.scatter(encoded_train[:, 0], encoded_train[:, 1], label="Train", alpha=0.6,s=10)
-    plt.scatter(encoded_test[:, 0], encoded_test[:, 1], label="Test", alpha=0.6,s=10)
+    
+    plt.figure(figsize=(10, 10))
+    plt.scatter(encoded_test[:, 0], encoded_test[:, 1], label="Test", alpha=0.3,s=10,c='#d92155')
+    plt.scatter(encoded_train[:, 0], encoded_train[:, 1], label="Train", alpha=0.2,s=10,c='#6d92eb')
     plt.title("Visualization of Encoded Molecules")
     plt.xlabel("Latent Dimension 1")
     plt.ylabel("Latent Dimension 2")
 
     # Add average distance text in the upper right corner
-    plt.text(0.5, 0.98, f'Average Distance: {avg_dist:.4f}', 
+    plt.text(0.05, 0.8, f'Average Distance: {avg_dist:.4f}', 
             transform=plt.gca().transAxes,  # Use relative coordinates
-            horizontalalignment='right',     # Right-align the text
-            verticalalignment='top',         # Top-align the text
+            horizontalalignment='left',     # Right-align the text
+            verticalalignment='bottom',         # Top-align the text
             bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))  # Add white background
 
     plt.legend()

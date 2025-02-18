@@ -228,7 +228,7 @@ class LightningModule(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "CCS_AVG_test_loss"
+                "monitor": "CCS_test_loss"
             }
         }
 

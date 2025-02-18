@@ -9,7 +9,7 @@ from argparse import ArgumentParser, Namespace
 from torch.utils.data import DataLoader
 
 # adduct [M+H]=0 [M+Na]=1  [M-H]=2 
-ADDUCT2IDX = {'[M+H]': 0, '[M-H]': 1, '[M+Na]': 2}
+ADDUCT2IDX = {'[M+H]+': 0, '[M-H]-': 1, '[M+Na]+': 2}
 
 class PropertyPredictionDataset(torch.utils.data.Dataset):
     def __init__(self, df,  measure_name, tokenizer, aug=True):

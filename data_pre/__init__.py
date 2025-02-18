@@ -2,7 +2,7 @@ from data_pre import data_module
 
 ORINGINAL_BASE_PATH = './oringinal_data'
 RESULTS_BASE_PATH = './results'
-TEMP_SAVE = './data'
+FINAL_DATA_PATH = './data'
 # ALLCCS_PATH = [BASE_PATH + r"/AllCCS download" + rf' ({i}).csv' for i in range(43)]
 ALLCCS_FINAL_PATH = [ORINGINAL_BASE_PATH + '/ALLCCS_FINAL.csv']
 ALLCCS_PATH = [ORINGINAL_BASE_PATH + '/ALLCCS_ISO.csv']

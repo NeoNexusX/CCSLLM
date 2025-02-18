@@ -5,7 +5,8 @@ import torch
 from sklearn.metrics import mean_squared_error, r2_score
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
-
+from matplotlib.colors import LinearSegmentedColormap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 # 读取数据函数
 def read_data(file_path):
     if file_path.endswith('.csv'):
@@ -83,11 +84,9 @@ def plot_ccs_comparison_torch(predicted_ccs,true_ccs, fig_name):
     plt.show()
 
 
-
-
-
 # 绘图函数
 def plot_ccs_comparison(data,fig_name):
+
     # 提取数据
     predicted_ccs = data['predicted_ccs'].values
     true_ccs = data['true_ccs'].values
@@ -98,34 +97,45 @@ def plot_ccs_comparison(data,fig_name):
     # 计算统计指标
     rmse, r2, median_error = calculate_statistics(predicted_ccs, true_ccs)
 
+    # #518ef4  #df366b
     # 创建颜色映射
-    norm = Normalize(vmin=0, vmax=30)  # 设置颜色映射范围
-    cmap = cm.viridis  # 使用viridis色图
-    colors = cmap(norm(relative_error))
+    colors = ['#5391f5','#8635a9','#8e2fa4','#aa2195','#d2196b','#da1653','#FF1653']  # 可根据需要调整颜色值
+    cmap = LinearSegmentedColormap.from_list("shap_custom", colors)
 
     # 绘制散点图
-    plt.figure(figsize=(8, 8))
-    scatter = plt.scatter(predicted_ccs, true_ccs, c=relative_error, cmap='viridis', s=20, alpha=0.8)
-    plt.colorbar(scatter, label='Relative Error (RE, %)')
+    fig, ax = plt.subplots(figsize=(10, 10))
+    scatter = ax.scatter(predicted_ccs, true_ccs, c=relative_error, cmap=cmap, s=10, alpha=1)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.2)
+    cbar = plt.colorbar(scatter,cax=cax)
+    cbar.set_label('Relative Error (RE, %)', fontsize=14)  # 颜色条标题字体大小
+    cbar.ax.tick_params(labelsize=12)  # 调整 colorbar 刻度字体大小
 
     # 添加y=x参考线
     x = np.linspace(min(predicted_ccs), max(predicted_ccs), 500)
-    plt.plot(x, x, 'k--', label='y = x')
+    ax.plot(x, x, 'k--', label='y = x')
+    # plt.legend(loc='lower right')  # 将图例放到右下角
 
     # 标注统计信息
     stats_text = (
         f"Median Error = {median_error:.1f} %\n"
-        f"RMSE = {rmse:.3f} Å²\n"
+        f"RMSE = {rmse:.3f} Å$^2$\n"
         f"$R^2$ = {r2:.3f}"
     )
-    plt.text(0.05, 0.95, stats_text, transform=plt.gca().transAxes, fontsize=10, 
-             verticalalignment='top', bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
+    ax.text(0.05, 0.95, stats_text, 
+            transform=ax.transAxes, 
+            fontsize=14, 
+            verticalalignment='top', 
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8,pad=0.3),
+            linespacing=1.8,
+            multialignment='left')
 
-    # 图形设置
-    plt.xlabel('Predicted CCS (Å²)')
-    plt.ylabel('Measured CCS (Å²)')
-    plt.title('CCS Comparison')
-    plt.legend()
+    # 图形设置y
+    ax.set_xlabel(r'Predicted CCS (Å$^2$)', fontsize=15)  # 使用原始 Å 加上标 2
+    ax.set_ylabel(r'Measured CCS (Å$^2$)', fontsize=15)
+    ax.set_title('CCS Comparison', fontsize=18)
+    ax.tick_params(axis='both', labelsize=14)  # 统一调整 x 轴和 y 轴刻度字体大小
+    ax.set_aspect('equal', adjustable='box')
     plt.tight_layout()
     plt.savefig(f"./{fig_name}")
     plt.show()
