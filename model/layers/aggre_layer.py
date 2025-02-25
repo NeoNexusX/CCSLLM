@@ -8,16 +8,16 @@ class Aggre(nn.Module):
     def __init__(self,smiles_reflect_dim,adduct_len=2,ecfp_len=1024,mz_len=1,dropout=0.2):
         super().__init__()    
         # 1. 对 `adduct`  'ecfp' 使用嵌入映射
-        self.emd_size =32
-        self.adduct_emb = nn.Embedding(3, self.emd_size)
+        self.emd_size =1024
+        self.adduct_emb = nn.Embedding(3, self.emd_size//2)
         self.ecfp_emb = nn.Linear(ecfp_len, self.emd_size)
-        self.sum_embedding = nn.Linear(smiles_reflect_dim, self.emd_size)
+        self.smiles_embedding_layer = nn.Linear(smiles_reflect_dim, self.emd_size)
 
-    def forward(self, sum_embedding ,m_z, adduct, ecfp):
+    def forward(self, smiles_embedding ,m_z, adduct, ecfp):
 
         # mask   [batch, length]
         # m/z    [batch]
-        # adduct [batch]
+        # adduct [batch] 
         # ecfp   [batch, ecfp_length]
 
         adduct = self.adduct_emb(adduct)
@@ -26,12 +26,12 @@ class Aggre(nn.Module):
         ecfp = self.ecfp_emb(ecfp)
         # [batch_size, 1]
 
-        m_z = m_z.unsqueeze(1).repeat(1,self.emd_size)
+        m_z = m_z.unsqueeze(1).repeat(1,self.emd_size//2)
         # [batch_size, 1]
 
-        sum_embedding = self.sum_embedding(sum_embedding)
+        smiles_embedding = self.smiles_embedding_layer(smiles_embedding)
         # 汇聚堆叠在一起
         
-        cat = torch.cat((sum_embedding,ecfp,adduct,m_z),dim=1)
+        cat = torch.cat((ecfp,smiles_embedding,adduct,m_z),dim=1)
 
         return cat

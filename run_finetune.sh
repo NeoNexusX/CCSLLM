@@ -4,8 +4,8 @@ python main.py \
         --n_head 12 \
         --n_layer 12 \
         --n_embd 768 \
-        --d_dropout 0.0 \
-        --dropout 0.0 \
+        --d_dropout 0.3 \
+        --dropout 0.3 \
         --lr_start 1e-5 \
         --num_workers 20\
         --max_epochs 1000 \
@@ -13,6 +13,6 @@ python main.py \
         --checkpoint_every 2 \
         --seed_path './Pretrained MoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt' \
         --dataset_name FINAL_DATA \
-        --data_root ./data/5 \
+        --data_root ./data/6 \
         --measure_name CCS \
-        --checkpoints_folder './ccs_linear'\
+        --checkpoints_folder './CCS_LLM'\

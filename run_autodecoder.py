@@ -13,10 +13,10 @@ from llm_predict import prepare_llm_data
 def prepare_ecfp_data():
 
     # Step 1: Load CSV and compute ECFP
-    train_csv_file = "data/5/ISO_METLIN_train.csv"  # Replace with your file path
+    train_csv_file = "data/5/FINAL_DATA_train.csv"  # Replace with your file path
     train_data = pd.read_csv(train_csv_file)
 
-    test_csv_file = "data/5/ISO_METLIN_test.csv"  # Replace with your file path
+    test_csv_file = "data/5/FINAL_DATA_test.csv"  # Replace with your file path
     test_data = pd.read_csv(test_csv_file)
 
 
@@ -37,7 +37,7 @@ def prepare_ecfp_data():
 if __name__ == '__main__':
 
     # prepare model:
-    model_name = 'XL_87'
+    model_name = 'XL_88'
     
     # train_ecfs,test_ecfs = prepare_ecfp_data()
     train_ecfs,test_ecfs,_,_,_,_ = prepare_llm_data(model_name)

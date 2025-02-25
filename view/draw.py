@@ -7,6 +7,8 @@ from matplotlib.colors import Normalize
 import matplotlib.cm as cm
 from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import seaborn as sns
+
 # 读取数据函数
 def read_data(file_path):
     if file_path.endswith('.csv'):
@@ -129,6 +131,11 @@ def plot_ccs_comparison(data,fig_name):
             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8,pad=0.3),
             linespacing=1.8,
             multialignment='left')
+    
+    min_val = min(min(predicted_ccs), min(true_ccs))  # 数据中的最小值
+    max_val = max(max(predicted_ccs), max(true_ccs))  # 数据中的最大值
+    ax.set_xlim(min_val, max_val)
+    ax.set_ylim(min_val, max_val)
 
     # 图形设置y
     ax.set_xlabel(r'Predicted CCS (Å$^2$)', fontsize=15)  # 使用原始 Å 加上标 2
@@ -139,3 +146,59 @@ def plot_ccs_comparison(data,fig_name):
     plt.tight_layout()
     plt.savefig(f"./{fig_name}")
     plt.show()
+
+    
+def plot_relative_error_boxplot(datasets, dataset_labels, colors, 
+                                title='relative_error_boxplot', xlabel='models', ylabel='relative_error (%)', 
+                                figsize=(10, 10), fontsize_title=14, fontsize_label=12):
+    """
+    绘制多个数据集的相对误差箱式图，每个数据集使用指定的颜色。
+
+    参数:
+    - datasets: list of str, 数据集 CSV 文件路径的列表。
+    - dataset_labels: list of str, 每个数据集的标签列表。
+    - colors: list of str, 每个数据集的颜色（十六进制格式）。
+    - title: str, 图表标题（默认: '各数据集相对误差箱式图'）。
+    - xlabel: str, x轴标签（默认: '数据集'）。
+    - ylabel: str, y轴标签（默认: '相对误差 (%)'）。
+    - figsize: tuple, 图表大小（默认: (10, 6)）。
+    - fontsize_title: int, 标题字体大小（默认: 14）。
+    - fontsize_label: int, 标签字体大小（默认: 12）。
+
+    返回:
+    - None, 直接显示箱式图。
+    """
+
+    if len(datasets) > len(colors):
+        raise ValueError("颜色列表不足以覆盖所有数据集。")
+    if len(datasets) > 7:
+        raise ValueError("数据集数量超过最大限制7个。")
+
+    # 读取所有数据集，计算相对误差，并合并到一个 DataFrame 中
+    all_data = []
+    for dataset, label in zip(datasets, dataset_labels):
+        df = pd.read_csv(dataset)
+        # 计算相对误差：|true_ccs - predicted_ccs| / true_ccs * 100%
+        df['relative_error'] = abs(df['true_ccs'] - df['predicted_ccs']) / df['true_ccs'] * 100
+        df['dataset'] = label
+        df = df[df['relative_error'] <= 10]
+        all_data.append(df)
+    all_data = pd.concat(all_data)
+
+    
+
+    # 创建颜色字典，为每个数据集分配颜色
+    color_dict = {label: color for label, color in zip(dataset_labels, colors)}
+
+    # 绘制箱式图
+    plt.figure(figsize=figsize)
+    ax = sns.boxplot(x='dataset', y='relative_error', data=all_data, palette=color_dict,showfliers=False)  # 关键参数：禁用离群值显示)
+    plt.title(title, fontsize=fontsize_title)
+    plt.xlabel(xlabel, fontsize=fontsize_label)
+    plt.ylabel(ylabel, fontsize=fontsize_label)
+    # 设置纵轴范围
+    plt.ylim(0, 10)  # 新增代码
+    plt.xticks(rotation=45)  # 旋转横轴标签，避免重叠
+
+    plt.tight_layout()
+    plt.savefig(f"./results/box.png")

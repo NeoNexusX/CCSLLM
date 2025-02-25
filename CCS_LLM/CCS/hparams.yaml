@@ -1,10 +1,10 @@
 aug: null
 batch_size: 64
-checkpoint_dir: ./ccs_linear/CCS/models
+checkpoint_dir: ./CCS_LLM/CCS/models
 checkpoint_every: 2
-checkpoint_root: ./ccs_linear/CCS
-checkpoints_folder: ./ccs_linear
-d_dropout: 0.0
+checkpoint_root: ./CCS_LLM/CCS
+checkpoints_folder: ./CCS_LLM
+d_dropout: 0.3
 data_root: ./data/5
 dataset_name: FINAL_DATA
 dataset_names:
@@ -17,7 +17,7 @@ dims:
 - 768
 - 768
 - 1
-dropout: 0.0
+dropout: 0.3
 eval_dataset_length: null
 fc_h: 512
 fold: 0
@@ -35,7 +35,7 @@ n_layer: 12
 num_classes: null
 num_feats: 32
 num_workers: 20
-results_dir: ./ccs_linear/CCS/results
+results_dir: ./CCS_LLM/CCS/results
 seed: 12345
 seed_path: ./Pretrained MoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt
 smiles_embedding: /dccstor/medscan7/smallmolecule/runs/ba-predictor/small-data/embeddings/protein/ba_embeddings_tanh_512_2986138_2.pt

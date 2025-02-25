@@ -16,7 +16,9 @@ from sklearn.metrics import r2_score
 from .head_layer import Head
 import pandas as pd
 # from .aggre_linear_layer import Aggre
+# from .aggre_attention_layer import Aggre
 from .aggre_layer import Aggre
+
 def append_to_file(filename, line):
     with open(filename, "a") as f:
         f.write(line + "\n")
@@ -72,6 +74,7 @@ class LightningModule(pl.LightningModule):
         #########################################
 
         self.fcs = []  
+
         # 默认使用了 L1 loss
         self.loss = torch.nn.MSELoss()
         # self.loss = torch.nn.L1Loss()
@@ -80,39 +83,8 @@ class LightningModule(pl.LightningModule):
         # self.aggre = Aggre(config.n_embd)
         
         self.aggre = Aggre(config.n_embd)
-        self.net = Head(self.aggre.emd_size*4, dims=config.dims, dropout=config.dropout)
+        self.net = Head(self.aggre.emd_size*3, dims=config.dims, dropout=config.dropout)
         self.max_r2 = 0
-
-    def forward(self, batch):
-        
-        idx = batch[0]# idx
-        mask = batch[1]# mask
-        m_z = batch[2] # m/z
-        adduct = batch[3] # adduct
-        ecfp = batch[4] # ecfp
-        targets = batch[-1] # ccs
-    
-        device = 'cuda'
-        # 确保 data 是一个 numpy 数组，然后将其转化为 torch 张量
-        print("predict is running")
-        data = torch.tensor(data, dtype=torch.float32).to(device)
-
-
-        # idx, mask, m_z, adduct, ecfp,_ = [x.to(device) for x in data]
-
-        x = self.tok_emb(idx)
-        x = self.blocks(x)
-        # x = model.aggre(x, m_z, adduct, ecfp)
-
-        input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
-        masked_embedding = x * input_mask_expanded
-        sum_embeddings = torch.sum(masked_embedding, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-8)
-        loss_input = sum_embeddings / sum_mask
-        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)   
-        pred = self.net(loss_input)
-
-        return pred.cpu().detach().numpy()
         
     class lm_layer(nn.Module):
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用
@@ -253,10 +225,10 @@ class LightningModule(pl.LightningModule):
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        # x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
+        # loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        # [batch, seq_len, emb_dim]
+        # input_mask_expanded : [batch, seq_len, emb_dim]
         masked_embedding = token_embeddings * input_mask_expanded
         # 对 mask 进行 使用
         sum_embeddings = torch.sum(masked_embedding, 1)
@@ -264,6 +236,7 @@ class LightningModule(pl.LightningModule):
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
         loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
+
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('train_loss', loss, on_step=True)
@@ -288,12 +261,14 @@ class LightningModule(pl.LightningModule):
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
         # x = self.aggre(x, m_z, adduct, ecfp)
         token_embeddings = x
+        # loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
         input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         masked_embedding = token_embeddings * input_mask_expanded
         sum_embeddings = torch.sum(masked_embedding, 1)
         sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
         loss_input = sum_embeddings / sum_mask
         loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
+
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('val_loss', loss, on_step=True)
@@ -330,7 +305,8 @@ class LightningModule(pl.LightningModule):
                         'predicted_ccs': preds_cpu
                     }
                     df = pd.DataFrame(data)
-                    df.to_csv('predictions.csv', index=False)  # 保存到当前目录的 predictions.csv 文件中
+                    r2_string = str(self.max_r2)
+                    df.to_csv('results/predictions'+f'_{r2_string}'+'.csv', index=False)  # 保存到当前目录的 predictions.csv 文件中
 
             print(f'r2 is {r2}')
             

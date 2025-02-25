@@ -95,12 +95,12 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
 
     # build a trainer
     trainer = pl.Trainer(
-        max_epochs=100,
+        max_epochs=10,
         gpus=1,
         callbacks=[
             pl.callbacks.EarlyStopping(
                 monitor='train_loss',
-                patience=20,
+                patience=2,
                 mode='min'
             ),
             pl.callbacks.LearningRateMonitor(logging_interval='epoch')
@@ -146,5 +146,5 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
             bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))  # Add white background
 
     plt.legend()
-    plt.savefig('./results/'+unit_name+'_autodecoder.png')
+    plt.savefig('./results/'+unit_name+'_autodecode.tif')
     plt.show()
