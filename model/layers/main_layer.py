@@ -15,6 +15,7 @@ from functools import partial
 from sklearn.metrics import r2_score
 from .head_layer import Head
 import pandas as pd
+from apex import optimizers
 # from .aggre_linear_layer import Aggre
 # from .aggre_attention_layer import Aggre
 from .aggre_layer import Aggre
@@ -40,6 +41,7 @@ class LightningModule(pl.LightningModule):
             self.hparams.measure_name + "min_epoch": 0,
         }
 
+        self.hparams.project_name
         # Word embeddings layer
         # 字典，嵌入曾参数初始化？这里没用上
         n_vocab, d_emb = len(tokenizer.vocab), config.n_embd
@@ -78,11 +80,10 @@ class LightningModule(pl.LightningModule):
         # 默认使用了 L1 loss
         self.loss = torch.nn.MSELoss()
         # self.loss = torch.nn.L1Loss()
-        
         # self.net = Head(config.n_embd, dims=config.dims, dropout=config.dropout)
         # self.aggre = Aggre(config.n_embd)
         
-        self.aggre = Aggre(config.n_embd)
+        self.aggre = Aggre(config.n_embd,adduct_len=10)
         self.net = Head(self.aggre.emd_size*3, dims=config.dims, dropout=config.dropout)
         self.max_r2 = 0
         
@@ -152,6 +153,7 @@ class LightningModule(pl.LightningModule):
         no_decay = set()
         whitelist_weight_modules = (torch.nn.Linear, )
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -188,11 +190,11 @@ class LightningModule(pl.LightningModule):
         if self.hparams.measure_name == 'r2':
             betas = (0.9, 0.999)
         else:
-            betas = (0.9, 0.99)
+            betas = (0.9, 0.999)
         print('betas are {}'.format(betas))
         learning_rate = self.train_config.lr_start * self.train_config.lr_multiplier
-        # optimizer = optimizers.FusedLAMB(optim_groups, lr=learning_rate, betas=betas)
-        optimizer = optim.Adam(optim_groups, lr=learning_rate, betas=betas)
+        optimizer = optimizers.FusedLAMB(optim_groups, lr=learning_rate, betas=betas)
+        # optimizer = optim.Adam(optim_groups, lr=learning_rate, betas=betas)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6) 
         
@@ -305,8 +307,15 @@ class LightningModule(pl.LightningModule):
                         'predicted_ccs': preds_cpu
                     }
                     df = pd.DataFrame(data)
-                    r2_string = str(self.max_r2)
-                    df.to_csv('results/predictions'+f'_{r2_string}'+'.csv', index=False)  # 保存到当前目录的 predictions.csv 文件中
+                    r2_string = str(round(self.max_r2,2))
+                    df.to_csv(self.hparams.results_dir+
+                                f'/{r2_string}_'+
+                                self.hparams.project_name+
+                                self.hparams.dataset_name+
+                                f'_{self.hparams.lr_start}_'+
+                                f'{self.hparams.batch_size}_'+
+                                f'{self.hparams.dropout}'+
+                              '.csv', index=False)  # 保存到当前log目录的 results文件夹中
 
             print(f'r2 is {r2}')
             
@@ -347,14 +356,5 @@ class LightningModule(pl.LightningModule):
             self.log(k, tensorboard_logs[k])
 
         print("Validation: Current Epoch", self.current_epoch)
-        append_to_file(
-            os.path.join(self.hparams.results_dir, "results_" + ".csv"),
-            f"{self.hparams.measure_name}, {self.current_epoch},"
-            + f"{tensorboard_logs[self.hparams.measure_name + '_valid_loss']},"
-            + f"{tensorboard_logs[self.hparams.measure_name + '_test_loss']},"
-            + f"{self.min_loss[self.hparams.measure_name + 'min_epoch']},"
-            + f"{self.min_loss[self.hparams.measure_name + 'min_valid_loss']},"
-            + f"{self.min_loss[self.hparams.measure_name + 'min_test_loss']}",
-        )
 
         return {"avg_val_loss": avg_loss}

@@ -170,3 +170,6 @@ data/*
 predictions*
 output*
 events*
+*CCS_LLM*/
+Linear/
+Linear_Allccs/

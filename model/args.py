@@ -88,7 +88,7 @@ def get_parser(parser=None):
                         default='../data/my_dataset',  # 默认值为命令行中的 data_root
                         help='Root directory for dataset')
     parser.add_argument('--batch_size', type=int, default=64)  # 默认值 64
-
+    parser.add_argument('--project_name', type=str, default='not_specify')  # 默认值 not_specify
     return parser
 
 def parse_args():

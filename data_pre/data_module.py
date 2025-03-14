@@ -108,6 +108,7 @@ class Data_reader:
         # 过滤
         self.data.drop_duplicates(None, keep='first', inplace=True, ignore_index=True)
         self.data.dropna(axis=0, how='any', inplace=True)
+        self.data = self.data.reset_index(drop=True)
         print("finish prepeocess with data , info is:")
         self.data.info()
 
@@ -241,6 +242,20 @@ class Data_reader:
 
         # return a series include index number
         return repeated_smiles
+    
+    def select_adduct_fre(self,threshold = 0.01):
+        # adduct 频率计算
+        adduct_freq = self.data["Adduct"].value_counts(normalize=True)
+        print(adduct_freq)
+        # 保留频率 >= 1% 的 adduct 类别
+        valid_adducts = adduct_freq[adduct_freq >= threshold].index
+        #figure which adduct freq is less than 0.01
+        print(f"adduct_freq less than {threshold} : \r\n {adduct_freq[adduct_freq < threshold].index.tolist()}")
+        # 过滤原始 DataFrame，仅保留有效 adduct 的行
+        self.data = self.data[self.data["Adduct"].isin(valid_adducts)]
+        self.data = self.data.reset_index(drop=True)
+        #print out all left adduct type
+        print(f"adduct_types:{len(valid_adducts)} \r\n{valid_adducts}")
 
 
 class Data_reader_METLIN(Data_reader):

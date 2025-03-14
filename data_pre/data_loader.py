@@ -9,7 +9,9 @@ from argparse import ArgumentParser, Namespace
 from torch.utils.data import DataLoader
 
 # adduct [M+H]=0 [M+Na]=1  [M-H]=2 
-ADDUCT2IDX = {'[M+H]+': 0, '[M-H]-': 1, '[M+Na]+': 2}
+ADDUCT2IDX = {'[M+H]+': 0, '[M-H]-': 1, '[M+Na]+': 2,
+              '[M+HCOO]-':3, '[M-H2O+H]+':4, '[M+Na-2H]-':5,
+              '[M+NH4]+':6, '[2M+Na]+':7, '[M-H+2Na]+':8, '[M+H-2H2O]+':9}
 
 class PropertyPredictionDataset(torch.utils.data.Dataset):
     def __init__(self, df,  measure_name, tokenizer, aug=True):
@@ -37,8 +39,14 @@ class PropertyPredictionDataset(torch.utils.data.Dataset):
         df['Adduct'] = df['Adduct'].apply(lambda x: ADDUCT2IDX.get(x))
         self.adduct = df['Adduct'].tolist()
 
-        # print(f"ADDUCT2IDX:{ADDUCT2IDX}\r\noriginal_smiles:{self.original_smiles[69]}\r\necfp:{self.ecfp[69]}\r\nmz:{self.mz[69]}\r\nadduct:{self.adduct[69]}\r\nadduct:{self.adduct_origin[69]}\r\n")
-        # print(f"ADDUCT2IDX:{ADDUCT2IDX}\r\noriginal_smiles:{self.original_smiles[70]}\r\necfp:{self.ecfp[70]}\r\nmz:{self.mz[70]}\r\nadduct:{self.adduct[70]}\r\nadduct:{self.adduct_origin[70]}\r\n")
+        # print(f"ADDUCT2IDX:{ADDUCT2IDX}\r\n
+        #       original_smiles:{self.original_smiles[69]}\r\n
+        #       ecfp:{self.ecfp[69]}\r\n
+        #       mz:{self.mz[69]}\r\n
+        #       adduct:{self.adduct[69]}\r\n
+        #       adduct:{self.adduct_origin[69]}\r\n")
+        df.info()
+        print(f"adduct max is :{max(self.adduct)}")
 
     def __getitem__(self, index):
         # 每一个元素是 [smiles, measure,m/z,adduct,ecfp]
@@ -60,7 +68,7 @@ class PropertyPredictionDataModule(pl.LightningDataModule):
     def get_split_dataset_filename(dataset_name, split):
         return dataset_name + "_" + split + ".csv"
 
-    def prepare_data(self):
+    def setup(self, stage=None):
         print("Inside prepare_dataset")
         train_filename = PropertyPredictionDataModule.get_split_dataset_filename(
             self.dataset_name, "train"

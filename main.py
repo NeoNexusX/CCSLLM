@@ -16,29 +16,23 @@ def main():
     print('pos_emb_type is {}'.format(pos_emb_type))
 
     run_name_fields = [
+        margs.project_name,
         margs.dataset_name,
-        margs.measure_name,
-        pos_emb_type,
-        margs.fold,
-        margs.mode,
         "lr",
         margs.lr_start,
         "batch",
         margs.batch_size,
         "drop",
         margs.dropout,
-        margs.dims,
     ]
 
     run_name = "_".join(map(str, run_name_fields))
 
-    print(run_name)
     datamodule = PropertyPredictionDataModule(margs)
-
     margs.dataset_names = "valid test".split()
 
     checkpoints_folder = margs.checkpoints_folder
-    checkpoint_root = os.path.join(checkpoints_folder, margs.measure_name)
+    checkpoint_root = checkpoints_folder
     margs.checkpoint_root = checkpoint_root
     os.makedirs(checkpoints_folder, exist_ok=True)
 
@@ -57,12 +51,13 @@ def main():
     r2_checkpoint_callback =  pl.callbacks.ModelCheckpoint(
         monitor="CCS_test_r2",
         mode="max",
-        save_top_k=5,
-        filename="best-model-{epoch:02d}-{CCS_test_r2:.4f}"
+        save_top_k=3,
+        filename="best-model-{epoch:02d}-{R2:.4f}"
     )
 
     print(margs)
     # 输出logger 设置
+ 
     logger = TensorBoardLogger(
         save_dir=checkpoint_root,
         version=run_name,

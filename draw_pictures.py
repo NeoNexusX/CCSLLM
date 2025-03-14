@@ -4,10 +4,10 @@ from view.draw import plot_ccs_comparison,plot_relative_error_boxplot
 
 if __name__ == '__main__':
 
-    test_name = 'test_2'
+    test_name = 'predictions_0.8948_att_0.csv'
     # 加载对比的 DataFrame
     
-    results_df = pd.read_csv('results/predictions_0.895_attention.csv')  # 需要比较的文件
+    results_df = pd.read_csv('results/'+test_name)  # 需要比较的文件
     # results_df = pd.read_csv('predictions.csv')  # 需要比较的文件
 
     try:

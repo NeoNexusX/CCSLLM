@@ -5,11 +5,11 @@ from fast_transformers.attention.full_attention import FullAttention
 
 class Aggre(nn.Module):
         
-    def __init__(self,smiles_reflect_dim,adduct_len=2,ecfp_len=1024,mz_len=1,dropout=0.2):
+    def __init__(self,smiles_reflect_dim,adduct_len=3,ecfp_len=1024,mz_len=1,dropout=0.2):
         super().__init__()    
         # 1. 对 `adduct`  'ecfp' 使用嵌入映射
         self.emd_size =1024
-        self.adduct_emb = nn.Embedding(3, self.emd_size//2)
+        self.adduct_emb = nn.Embedding(adduct_len, self.emd_size//2)
         self.ecfp_emb = nn.Linear(ecfp_len, self.emd_size)
         self.smiles_embedding_layer = nn.Linear(smiles_reflect_dim, self.emd_size)
 
