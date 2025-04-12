@@ -9,13 +9,61 @@ from argparse import ArgumentParser, Namespace
 from torch.utils.data import DataLoader
 
 # adduct [M+H]=0 [M+Na]=1  [M-H]=2 
-ADDUCT2IDX = {'[M+H]+': 0, '[M-H]-': 1, '[M+Na]+': 2,
-              '[M+HCOO]-':3, '[M-H2O+H]+':4, '[M+Na-2H]-':5,
-              '[M+NH4]+':6, '[2M+Na]+':7, '[M-H+2Na]+':8, '[M+H-2H2O]+':9}
+ADDUCT2IDX = {
+    '[M+H]+': 0, 
+    '[M-H]-': 1, 
+    '[M+Na]+': 2,
+    '[M+HCOO]-': 3, 
+    '[M-H2O+H]+': 4, 
+    '[M+Na-2H]-': 5,
+    '[M+NH4]+': 6, 
+    '[2M+Na]+': 7, 
+    '[M-H+2Na]+': 8, 
+    '[M+H-2H2O]+': 9,
+    '[M-H2O-H]-': 10,
+    '[M-H+2K]+': 11,
+    '[M-2H+3Na]+': 12,
+    '[M+K]+': 13,
+    '[2M+H]+': 14,
+    '[M+CH3COONa-H]-': 15,
+    '[2M+Na-2H]-': 16,
+    '[M+K-H+HCOO]-': 17,
+    '[M+Na-H+Cl]-': 18,
+    '[M+Na-H+HCOO]-': 19,
+    '[M-SO3-H]-': 20,
+    '[M+Cl]-': 21,
+    '[M+K-2H]-': 22,
+    'M+': 23,
+    '[M+CH3COO]-': 24,
+    '[M+H-NH3]+': 25,
+    '[M-3H2O+H]+': 26,
+    '[M-HF-H2O+H]+': 27,
+    '[M-HF+H]+': 28,
+    '[M-CH3COOH-H2O+H]+': 29,
+    '[M-CH3COOH+H]+': 30,
+    '[M-3H]-': 31,
+    '[M-H2O+HCOO]-': 32,
+    '[M-SO3-H2O-H]-': 33,
+    '[M-SO3-2H2O+H]+': 34,
+    '[M-SO3-H2O+H]+': 35,
+    '[2M-H]-': 36,
+    '[M-H+HCOOH]-': 37,
+    '[M-Cl+O]-': 38,
+    '[M-C6H8O6-H2O+H]+': 39,
+    '[M-C6H8O6-2H2O+H]+': 40,
+    '[M+K-H+Cl]-': 41,
+    '[M-Br+O]-': 42,
+    '[M-SO3-H2O+HCOO]-': 43,
+    '[M-2SO3-2H2O+H]+': 44,
+    '[M+Na-H2O]+': 45,
+    '[M-CO2-H]-': 46,
+    '[M-SO3+H]+': 47
+}
 
 class PropertyPredictionDataset(torch.utils.data.Dataset):
     def __init__(self, df,  measure_name, tokenizer, aug=True):
-        df = df.dropna()  # TODO - Check why some rows are na
+        
+        df = df.dropna()
         self.df = df
 
         #smiles
@@ -28,7 +76,6 @@ class PropertyPredictionDataset(torch.utils.data.Dataset):
         # calculate ecfp 
         df['ecfp'] = df['smiles'].apply(calculate_ecfp)
         self.ecfp = df['ecfp'].tolist()
-        df.info()
 
         # mz 
         df['m/z'] = df['m/z'] / 1e3
@@ -38,13 +85,9 @@ class PropertyPredictionDataset(torch.utils.data.Dataset):
         self.adduct_origin = df['Adduct'].tolist()
         df['Adduct'] = df['Adduct'].apply(lambda x: ADDUCT2IDX.get(x))
         self.adduct = df['Adduct'].tolist()
+        self.adduct_type = set(df['Adduct'].unique())
+        print(self.adduct_type)
 
-        # print(f"ADDUCT2IDX:{ADDUCT2IDX}\r\n
-        #       original_smiles:{self.original_smiles[69]}\r\n
-        #       ecfp:{self.ecfp[69]}\r\n
-        #       mz:{self.mz[69]}\r\n
-        #       adduct:{self.adduct[69]}\r\n
-        #       adduct:{self.adduct_origin[69]}\r\n")
         df.info()
         print(f"adduct max is :{max(self.adduct)}")
 
@@ -61,14 +104,30 @@ class PropertyPredictionDataModule(pl.LightningDataModule):
         if type(hparams) is dict:
             hparams = Namespace(**hparams)
         self.hparams = hparams
-        #self.smiles_emb_size = hparams.n_embd
         self.tokenizer = MolTranBertTokenizer('bert_vocab.txt')
         self.dataset_name = hparams.dataset_name
 
     def get_split_dataset_filename(dataset_name, split):
         return dataset_name + "_" + split + ".csv"
 
+    def test_setup(self, stage=None):
+
+        test_filename = PropertyPredictionDataModule.get_split_dataset_filename(
+            self.dataset_name, "test"
+        )
+
+        test_ds = get_dataset(
+            self.hparams.data_root,
+            test_filename,
+            self.hparams.eval_dataset_length,
+            aug=False,
+            measure_name=self.hparams.measure_name,
+        )
+
+        self.val_ds = [test_ds]
+
     def setup(self, stage=None):
+
         print("Inside prepare_dataset")
         train_filename = PropertyPredictionDataModule.get_split_dataset_filename(
             self.dataset_name, "train"
@@ -106,12 +165,10 @@ class PropertyPredictionDataModule(pl.LightningDataModule):
             measure_name=self.hparams.measure_name,
         )
 
+        self.adduct_num = len(train_ds.adduct_type|val_ds.adduct_type|test_ds.adduct_type)
+        print('adduct_num  is ' + f"{self.adduct_num}")
         self.train_ds = train_ds
         self.val_ds = [val_ds] + [test_ds]
-        # 合并成一个 list【val_ds，test_ds】 方便后边迭代
-        # print(
-        #     f"Train dataset size: {len(self.train_ds)}, val: {len(self.val_ds1), len(self.val_ds2)}, test: {len(self.test_ds)}"
-        # )
 
     def collate(self, batch):
         # 将每一个分子式smiles 编码 tokenlize， 同时执行长度填充，动态填充到每一个批次大小相同
@@ -133,6 +190,7 @@ class PropertyPredictionDataModule(pl.LightningDataModule):
                 num_workers=self.hparams.num_workers,
                 shuffle=False,
                 collate_fn=self.collate,
+                drop_last=True,
             )
             for ds in self.val_ds
         ]
@@ -143,6 +201,7 @@ class PropertyPredictionDataModule(pl.LightningDataModule):
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             shuffle=True,
+            drop_last=True,
             collate_fn=self.collate,
         )
 

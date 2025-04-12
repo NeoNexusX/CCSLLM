@@ -1,50 +1,44 @@
 import torch
 import random
-import os
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-import torch.optim as optim
 import numpy as np
 from scipy.stats import pearsonr
 from ..rotate_attention.rotate_builder import RotateEncoderBuilder as rotate_builder
 from fast_transformers.feature_maps import GeneralizedRandomFeatures
 from fast_transformers.masking import LengthMask as LM
-from fast_transformers.masking import FullMask as FL
 from functools import partial
 from sklearn.metrics import r2_score
 from .head_layer import Head
 import pandas as pd
+from .aggre_layer import Aggre_Linear,Aggre_Attention
 from apex import optimizers
-# from .aggre_linear_layer import Aggre
-# from .aggre_attention_layer import Aggre
-from .aggre_layer import Aggre
 
 def append_to_file(filename, line):
     with open(filename, "a") as f:
         f.write(line + "\n")
 
 
-
 class LightningModule(pl.LightningModule):
 
     def __init__(self, config, tokenizer):
+        
         super(LightningModule, self).__init__()
         # 读取参数然后 将参数给特定的参数
         self.config = config
         self.hparams = config
-        self.mode = config.mode
+        self.type = config.type
         self.save_hyperparameters(config)
         self.tokenizer=tokenizer
         self.min_loss = {
             self.hparams.measure_name + "min_valid_loss": torch.finfo(torch.float32).max,
             self.hparams.measure_name + "min_epoch": 0,
         }
-
-        self.hparams.project_name
         # Word embeddings layer
         # 字典，嵌入曾参数初始化？这里没用上
         n_vocab, d_emb = len(tokenizer.vocab), config.n_embd
+
         # input embedding stem
         # 核心模块构建
         builder = rotate_builder.from_kwargs(
@@ -57,6 +51,7 @@ class LightningModule(pl.LightningModule):
             feature_map=partial(GeneralizedRandomFeatures, n_dims=config.num_feats),
             activation='gelu',
             )
+        # -------------------------------------------------------------------------
         # 以上为参数初始化
 
         # 位置编码没有
@@ -65,35 +60,32 @@ class LightningModule(pl.LightningModule):
         self.tok_emb = nn.Embedding(n_vocab, config.n_embd)
         self.drop = nn.Dropout(config.d_dropout)
         # transformer 的初始化 
-        ## transformer
         self.blocks = builder.get()
         # 词翻译层初始化
         self.lang_model = self.lm_layer(config.n_embd, n_vocab)
         self.train_config = config
-        #if we are starting from scratch set seeds
-        #########################################
-        # protein_emb_dim, smiles_embed_dim, dims=dims, dropout=0.2):
-        #########################################
 
-        self.fcs = []  
-
+        # -------------------------------------------------------------------------
         # 默认使用了 L1 loss
         self.loss = torch.nn.MSELoss()
-        # self.loss = torch.nn.L1Loss()
-        # self.net = Head(config.n_embd, dims=config.dims, dropout=config.dropout)
-        # self.aggre = Aggre(config.n_embd)
-        
-        self.aggre = Aggre(config.n_embd,adduct_len=10)
-        self.net = Head(self.aggre.emd_size*3, dims=config.dims, dropout=config.dropout)
-        self.max_r2 = 0
+        self.net = Head(config.n_embd,dropout=config.dropout)
+
+        if 'ATT' in self.config.project_name:
+            self.aggre = Aggre_Attention(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)
+        elif 'Linear' in self.config.project_name:
+            self.aggre = Aggre_Linear(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)
+
+        self.max_r2 = 0.9
         
     class lm_layer(nn.Module):
+
         # lang 实现， 在训练不起任何作用，只为了预训练预测使用
         def __init__(self, n_embd, n_vocab):
             super().__init__()
             self.embed = nn.Linear(n_embd, n_embd)
             self.ln_f = nn.LayerNorm(n_embd)
             self.head = nn.Linear(n_embd, n_vocab, bias=False)
+
         def forward(self, tensor):
             tensor = self.embed(tensor)
             tensor = F.gelu(tensor)
@@ -104,11 +96,18 @@ class LightningModule(pl.LightningModule):
     def get_loss(self, smiles_emb, measures):
         #  loss 计算 squeeze 移除 （N，1）
         z_pred = self.net.forward(smiles_emb).squeeze()
-        # z_pred = self.net.forward(smiles_emb)
         measures = measures.float()
 
         return self.loss(z_pred, measures), z_pred, measures
     
+    def get_pred(self, smiles_emb, measures):
+        #  loss 计算 squeeze 移除 （N，1）
+        z_pred = self.net.forward(smiles_emb).squeeze()
+        # z_pred = self.net.forward(smiles_emb)
+        measures = measures.float()
+
+        return z_pred, measures
+
     def on_save_checkpoint(self, checkpoint):
         #save RNG states each time the model and states are saved
         out_dict = dict()
@@ -153,7 +152,6 @@ class LightningModule(pl.LightningModule):
         no_decay = set()
         whitelist_weight_modules = (torch.nn.Linear, )
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-        
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -194,9 +192,8 @@ class LightningModule(pl.LightningModule):
         print('betas are {}'.format(betas))
         learning_rate = self.train_config.lr_start * self.train_config.lr_multiplier
         optimizer = optimizers.FusedLAMB(optim_groups, lr=learning_rate, betas=betas)
-        # optimizer = optim.Adam(optim_groups, lr=learning_rate, betas=betas)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6) 
+            optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-6) 
         
         return {
             "optimizer": optimizer,
@@ -208,81 +205,79 @@ class LightningModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        # idx([8, 56])
-        # mask([8, 56])
-        # m/z([8])
-        # adduct([8])
-        # ecfp([8, 1024])
-        # ccs([8])
         idx = batch[0]# idx
         mask = batch[1]# mask
         m_z = batch[2] # m/z
         adduct = batch[3] # adduct
         ecfp = batch[4] # ecfp
         targets = batch[-1] # ccs
-
         loss = 0
 
-        b, t = idx.size()
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        token_embeddings = x
-        # loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
-        input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        # input_mask_expanded : [batch, seq_len, emb_dim]
-        masked_embedding = token_embeddings * input_mask_expanded
-        # 对 mask 进行 使用
-        sum_embeddings = torch.sum(masked_embedding, 1)
-        # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        loss_input = sum_embeddings / sum_mask
-        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
+
+        if self.hparams.type == 'early':
+            _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+            input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
+            # input_mask_expanded : [batch, seq_len, emb_dim]
+            masked_embedding = x * input_mask_expanded
+            # 对 mask 进行 使用
+            sum_embeddings = torch.sum(masked_embedding, 1)
+            # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
+            sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-7)
+            loss_input = sum_embeddings / sum_mask
+
+        elif self.hparams.type == 'later':
+            _ ,loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
 
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('train_loss', loss, on_step=True)
-
-        logs = {"train_loss": loss}
-
         return {"loss": loss}
 
     def validation_step(self, val_batch, batch_idx, dataset_idx):
+
         idx =  val_batch[0]
         mask = val_batch[1]
         m_z = val_batch[2] # m/z
         adduct = val_batch[3] # adduct
         ecfp = val_batch[4] # ecfp
         targets = val_batch[-1]
-
         loss = 0
 
-        b, t = idx.size()
         token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
-        # x = self.aggre(x, m_z, adduct, ecfp)
-        token_embeddings = x
-        # loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
-        input_mask_expanded = mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        masked_embedding = token_embeddings * input_mask_expanded
-        sum_embeddings = torch.sum(masked_embedding, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        loss_input = sum_embeddings / sum_mask
-        loss_input = self.aggre(loss_input, m_z, adduct, ecfp)
+
+        if self.hparams.type == 'early':
+            _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+            input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
+            # input_mask_expanded : [batch, seq_len, emb_dim]
+            masked_embedding = x * input_mask_expanded
+            # 对 mask 进行 使用
+            sum_embeddings = torch.sum(masked_embedding, 1)
+            # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
+            sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-7)
+            loss_input = sum_embeddings / sum_mask
+            
+        elif self.hparams.type == 'later':
+            _ ,loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
 
         loss, pred, actual = self.get_loss(loss_input, targets)
 
         self.log('val_loss', loss, on_step=True)
         return {
-            "val_loss": loss,
-            "pred": pred.detach(),
-            "actual": actual.detach(),
+            "val_loss" : loss,
+            "pred" : pred.detach(),
+            "actual" : actual.detach(),
+            "adduct" :  adduct.detach(),
+            "idx" : idx.detach(),
             "dataset_idx": dataset_idx,
         }
     
     def validation_epoch_end(self, outputs):
-        # results_by_dataset = self.split_results_by_dataset(outputs)
+
         tensorboard_logs = {}
         for dataset_idx, batch_outputs in enumerate(outputs):
             dataset = self.hparams.dataset_names[dataset_idx]
@@ -300,23 +295,21 @@ class LightningModule(pl.LightningModule):
 
             if dataset=='test':
                 if r2 > self.max_r2:
-                    self.max_r2 = r2
                     # 将数据写入 CSV
                     data = {
                         'true_ccs': actuals_cpu,
                         'predicted_ccs': preds_cpu
                     }
                     df = pd.DataFrame(data)
-                    r2_string = str(round(self.max_r2,2))
                     df.to_csv(self.hparams.results_dir+
-                                f'/{r2_string}_'+
+                                f'/{round(r2,4)}_'+
                                 self.hparams.project_name+
                                 self.hparams.dataset_name+
-                                f'_{self.hparams.lr_start}_'+
-                                f'{self.hparams.batch_size}_'+
-                                f'{self.hparams.dropout}'+
+                                f'_{self.current_epoch}'
+                                f'_{self.hparams.lr_start}'+
+                                f'_{self.hparams.batch_size}'+
+                                f'_{self.hparams.dropout}'+
                               '.csv', index=False)  # 保存到当前log目录的 results文件夹中
-
             print(f'r2 is {r2}')
             
             tensorboard_logs.update(

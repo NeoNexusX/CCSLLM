@@ -106,10 +106,10 @@ def plot_ccs_comparison(data,fig_name):
 
     # 绘制散点图
     fig, ax = plt.subplots(figsize=(10, 10))
-    scatter = ax.scatter(predicted_ccs, true_ccs, c=relative_error, cmap=cmap, s=10, alpha=1)
+    scatter = ax.scatter(predicted_ccs, true_ccs, c=relative_error, cmap=cmap, s=10, alpha=1,vmin=0, vmax=50)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.2)
-    cbar = plt.colorbar(scatter,cax=cax)
+    cbar = plt.colorbar(scatter,cax=cax,extend='max')
     cbar.set_label('Relative Error (RE, %)', fontsize=14)  # 颜色条标题字体大小
     cbar.ax.tick_params(labelsize=12)  # 调整 colorbar 刻度字体大小
 
@@ -150,7 +150,7 @@ def plot_ccs_comparison(data,fig_name):
     
 def plot_relative_error_boxplot(datasets, dataset_labels, colors, 
                                 title='relative_error_boxplot', xlabel='models', ylabel='relative_error (%)', 
-                                figsize=(10, 10), fontsize_title=14, fontsize_label=12):
+                                figsize=(10, 10), fontsize_title=14, fontsize_label=14,name='test'):
     """
     绘制多个数据集的相对误差箱式图，每个数据集使用指定的颜色。
 
@@ -181,18 +181,22 @@ def plot_relative_error_boxplot(datasets, dataset_labels, colors,
         # 计算相对误差：|true_ccs - predicted_ccs| / true_ccs * 100%
         df['relative_error'] = abs(df['true_ccs'] - df['predicted_ccs']) / df['true_ccs'] * 100
         df['dataset'] = label
-        df = df[df['relative_error'] <= 10]
+        # df = df[df['relative_error'] <= 10]
         all_data.append(df)
     all_data = pd.concat(all_data)
-
-    
 
     # 创建颜色字典，为每个数据集分配颜色
     color_dict = {label: color for label, color in zip(dataset_labels, colors)}
 
     # 绘制箱式图
     plt.figure(figsize=figsize)
-    ax = sns.boxplot(x='dataset', y='relative_error', data=all_data, palette=color_dict,showfliers=False)  # 关键参数：禁用离群值显示)
+    ax = sns.boxplot(
+        x='dataset', 
+        y='relative_error', 
+        data=all_data, 
+        palette=color_dict,
+        showfliers=False,
+        boxprops=dict(edgecolor='none'))  # 关键参数：禁用离群值显示)
     plt.title(title, fontsize=fontsize_title)
     plt.xlabel(xlabel, fontsize=fontsize_label)
     plt.ylabel(ylabel, fontsize=fontsize_label)
@@ -201,4 +205,4 @@ def plot_relative_error_boxplot(datasets, dataset_labels, colors,
     plt.xticks(rotation=45)  # 旋转横轴标签，避免重叠
 
     plt.tight_layout()
-    plt.savefig(f"./results/box.png")
+    plt.savefig(f"./results/{name}.png",dpi=600)

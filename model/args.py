@@ -77,8 +77,8 @@ def get_parser(parser=None):
                         help='Path to SMILES embeddings')
     parser.add_argument('--aug', type=int, required=False)
     parser.add_argument('--num_classes', type=int, required=False)
-    parser.add_argument('--dataset_name', type=str, required=False, default='sigma_ccs_pre_[M+Na]+')  # 默认值为命令行中的 dataset_name
-    parser.add_argument('--measure_name', type=str, required=False, default='Na')  # 默认值 'Na'
+    parser.add_argument('--dataset_name', type=str, required=False, default='not_specify')  # 默认值为命令行中的 dataset_name
+    parser.add_argument('--measure_name', type=str, required=False, default='ccs')  # 默认值 'Na'
     parser.add_argument('--checkpoints_folder', type=str, required=True, help='Folder to store checkpoints')
     parser.add_argument('--checkpoint_root', type=str, required=False)
 
@@ -87,8 +87,12 @@ def get_parser(parser=None):
                         required=False,
                         default='../data/my_dataset',  # 默认值为命令行中的 data_root
                         help='Root directory for dataset')
+    
     parser.add_argument('--batch_size', type=int, default=64)  # 默认值 64
     parser.add_argument('--project_name', type=str, default='not_specify')  # 默认值 not_specify
+    parser.add_argument('--type', type=str, default='attention')  # 默认值 attention
+    parser.add_argument('--adduct_num', type=int, default=3)  # 默认值 attention
+    parser.add_argument('--ecfp_num', type=int, default=0)  # 默认值 attention
     return parser
 
 def parse_args():

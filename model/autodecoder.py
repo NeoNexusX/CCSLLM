@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 import matplotlib.pyplot as plt
+from pytorch_lightning.callbacks import EarlyStopping
 
 # Step 1: Define Autoencoder
 class Autoencoder(pl.LightningModule):
@@ -46,6 +47,13 @@ class Autoencoder(pl.LightningModule):
         self.log('train_loss', loss, prog_bar=True)
         return loss
     
+    def validation_step(self,batch,batch_idx):
+        x = batch[0]
+        encoder,y_hat = self(x)
+        loss = self.loss(y_hat,x)
+        self.log('test_loss', loss, prog_bar=True)
+        return loss
+    
     def test_step(self,batch):
         x = batch[0]
         encoder,y_hat = self(x)
@@ -81,12 +89,13 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # concat test and train
-    all_emb = torch.cat((test_emb,train_emb),dim=0)
-    all_dataset = TensorDataset(all_emb)
+    train_dataset = TensorDataset(train_emb)
+    test_dataset = TensorDataset(test_emb)
     
     # dataloader threads number for differnet version
-    num_workers = 64 if all_emb.device == 'cpu' else 0 
-    all_dataloader= DataLoader(all_dataset, batch_size=64, shuffle=False,num_workers=num_workers)
+    num_workers = 64 if test_emb.device == 'cpu' else 0 
+    train_dataloader = DataLoader(train_dataset, batch_size=64, shuffle=False,num_workers=num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=64, shuffle=False,num_workers=num_workers)
     
     # build a model
     autoencoder = Autoencoder(input_dim =test_emb.shape[1],latent_dim=2,mode=unit_name)
@@ -95,12 +104,13 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
 
     # build a trainer
     trainer = pl.Trainer(
-        max_epochs=10,
+        max_epochs=100,
         gpus=1,
         callbacks=[
             pl.callbacks.EarlyStopping(
-                monitor='train_loss',
-                patience=2,
+                monitor='test_loss',
+                patience=10,
+                min_delta=0.01,
                 mode='min'
             ),
             pl.callbacks.LearningRateMonitor(logging_interval='epoch')
@@ -110,7 +120,7 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
     )
 
     # fit  指定数据集
-    trainer.fit(autoencoder, all_dataloader)
+    trainer.fit(autoencoder, train_dataloader,test_dataloader)
 
     # set for eval mode
     autoencoder.eval()
@@ -132,19 +142,11 @@ def train_predict_autodecoer(test_emb,train_emb,unit_name='discrete'):
         print(f'average_distances :{average_distances.mean()}')
     
     plt.figure(figsize=(10, 10))
-    plt.scatter(encoded_test[:, 0], encoded_test[:, 1], label="Test", alpha=0.3,s=10,c='#d92155')
     plt.scatter(encoded_train[:, 0], encoded_train[:, 1], label="Train", alpha=0.2,s=10,c='#6d92eb')
+    plt.scatter(encoded_test[:, 0], encoded_test[:, 1], label="Test", alpha=0.3,s=10,c='#d92155')
     plt.title("Visualization of Encoded Molecules")
     plt.xlabel("Latent Dimension 1")
     plt.ylabel("Latent Dimension 2")
-
-    # Add average distance text in the upper right corner
-    plt.text(0.05, 0.8, f'Average Distance: {avg_dist:.4f}', 
-            transform=plt.gca().transAxes,  # Use relative coordinates
-            horizontalalignment='left',     # Right-align the text
-            verticalalignment='bottom',         # Top-align the text
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))  # Add white background
-
-    plt.legend()
-    plt.savefig('./results/'+unit_name+'_autodecode.tif')
+    # plt.legend()
+    plt.savefig('./results/'+unit_name+f'{avg_dist}_autodecode.tif')
     plt.show()

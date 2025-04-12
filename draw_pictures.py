@@ -4,19 +4,21 @@ from view.draw import plot_ccs_comparison,plot_relative_error_boxplot
 
 if __name__ == '__main__':
 
-    test_name = 'predictions_0.8948_att_0.csv'
+    test_name = '0.9011_ATT_DelecfpFD_M0_160_1e-05_64_0.0'
     # 加载对比的 DataFrame
     
-    results_df = pd.read_csv('results/'+test_name)  # 需要比较的文件
-    # results_df = pd.read_csv('predictions.csv')  # 需要比较的文件
+    results_df = pd.read_csv('results/'+test_name+'.csv')  # 需要比较的文件
 
     try:
-        plot_ccs_comparison(results_df,f'results_{test_name}.png')
+        plot_ccs_comparison(results_df,'results/'+f'results_{test_name}.tif')
     except Exception as e:
         print(f"error : {e}")
 
-    # dataset = ['./results/predictions_0.8824_best.csv','results/predictions_0.7848181739199651.csv','results/predictions_0.8654300104795007.csv']
-    # dataset_lable = ['HyperCCS','CCSP2.0','CCSBase','DeepCCS']
-    # colors = ['#5391f5', '#8635a9', '#8e2fa4', '#aa2195', '#d2196b', '#da1653', '#FF1653']
-
-    # plot_relative_error_boxplot(dataset,dataset_lable,colors)
+    # dataset = ['results/0.9921_ATT_12_ACFD_A0_1e-06_32_0.0.csv',
+    #            'results/0.97_MLLinear_A0FD_A0_1e-05_64_0.0.csv',
+    #            'results/0.9705_LE_A0.csv',
+    #            'results/ccsp2_allccs2.csv',]
+    # dataset_lable = ['HyperCCS','Molformer','KerasECFP','CCSP2']
+    # colors = ['#6ac1a5', '#e88d67', '#8ca1c9', '#e790c2', '#d2196b', '#a6d558']
+    # name = 'METLIN'
+    # plot_relative_error_boxplot(dataset,dataset_lable,colors,name)

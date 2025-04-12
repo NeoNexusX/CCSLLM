@@ -26,7 +26,7 @@ if __name__ == '__main__':
             dataset_H_miner.to_excel(target_dir + '/'+ final_data_name +'_H-_'+type+'.xlsx', index=False)
 
 
-    for i in range(0, 5):
+    for i in range(10,11):
 
         final_data_name = 'FD_A' + str(i) # Final Data Metlin
         name_flod = '/'+ final_data_name
@@ -46,27 +46,31 @@ if __name__ == '__main__':
                                 fun=lambda path, col_name: pd.read_csv(path, usecols=col_name))
         print("index is here:")
         print(final_data.data.index)
+        final_data.data.rename(columns={'Structure':'smiles'},inplace=True)
+        final_data.data['Input'] = final_data.data['Name']
 
-        final_data.data.rename(columns={'Structure':'smiles',"Molecule Name":"Name"},inplace=True)
-        final_data.data['Input'] = final_data.data['Formula']
-
+        # final_data.data.rename(columns={'CCS_AVG':'CCS',"Molecule Name":"Name"},inplace=True)
+        # final_data.data['Input'] = final_data.data['Name']
+        final_data.data.info()
+        
         final_data.print_uniques()
         final_data.select_adduct_fre()
-
         final_data.data.info()
 
+        final_data.data.to_csv('Selected_FullALLCCS2.csv', index=False)
+
         # write data as csv
-        test_dataset, valid_dataset = final_data.random_split(
-            [int(len(final_data.data) * 0.2), 
-            int(len(final_data.data) * 0.1)])
+        # test_dataset, valid_dataset = final_data.random_split(
+        #     [int(len(final_data.data) * 0.2), 
+        #     int(len(final_data.data) * 0.1)])
         
         
         # Set dataset name
-        final_data.data.to_csv(target_dir + '/'+ final_data_name +'_train.csv', index=False)
+        # final_data.data.to_csv(target_dir + '/'+ final_data_name +'_train.csv', index=False)
         # dataset_separator(final_data.data,final_data_name,type='train')
 
-        test_dataset.to_csv(target_dir +'/'+ final_data_name +'_test.csv' , index=False)
+        # test_dataset.to_csv(target_dir +'/'+ final_data_name +'_test.csv' , index=False)
         # dataset_separator(test_dataset,final_data_name,type='test')
 
-        valid_dataset.to_csv(target_dir +'/'+ final_data_name +'_valid.csv' , index=False)
+        # valid_dataset.to_csv(target_dir +'/'+ final_data_name +'_valid.csv' , index=False)
         # dataset_separator(valid_dataset,final_data_name,type='valid')

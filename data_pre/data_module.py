@@ -2,6 +2,9 @@ import time
 import pandas as pd
 import random
 from concurrent.futures.thread import ThreadPoolExecutor
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
 from .data_utils import tran_iupac2smiles_fun, tran_iso2can_rdkit, restful_pub_finder, \
     SMILES_BASE_FINDER, tran_iupac2can_smiles_cir, restful_pub_name_finder
 
@@ -176,10 +179,13 @@ class Data_reader:
 
         assert len(count) == 2
         random_numbers_test = random.sample(range(len(self.data)), count[0])
-        random_numbers_valid = random.sample(range(len(self.data)), count[1])
         random_data_test = self.data.loc[random_numbers_test]
+        self.data = self.data.drop(index=random_numbers_test)
+        self.data.reset_index(drop=True, inplace=True)
+        print(f"still left : {len(self.data)}")
+
+        random_numbers_valid = random.sample(range(len(self.data)), count[1])
         random_data_valid = self.data.loc[random_numbers_valid]
-        self.data = self.data.drop(index=random_numbers_test + random_numbers_valid)
 
         return random_data_test, random_data_valid
 
@@ -243,19 +249,100 @@ class Data_reader:
         # return a series include index number
         return repeated_smiles
     
-    def select_adduct_fre(self,threshold = 0.01):
-        # adduct 频率计算
+    def select_adduct_fre(self, threshold=0.01):
+        # adduct 频率计算（返回归一化的频率，范围 0~1）
         adduct_freq = self.data["Adduct"].value_counts(normalize=True)
-        print(adduct_freq)
-        # 保留频率 >= 1% 的 adduct 类别
+        
+        # 将频率转换为百分比字符串（如 0.05 → "5.00%"）
+        adduct_freq_percent = (adduct_freq * 100).round(2).astype(str) + '%'
+        
+        # 打印所有 adduct 的频率（百分比格式）
+        print("Adduct 频率分布（百分比）:")
+        print(adduct_freq_percent.to_string())  # 避免科学计数法
+        self._plot_adduct_frequency(threshold,bar_hat=False,name='original')
+        
+        # 保留频率 >= threshold（如 1%）的 adduct 类别
         valid_adducts = adduct_freq[adduct_freq >= threshold].index
-        #figure which adduct freq is less than 0.01
-        print(f"adduct_freq less than {threshold} : \r\n {adduct_freq[adduct_freq < threshold].index.tolist()}")
+        
+        # 打印频率 < threshold 的 adduct 类别（百分比格式）
+        low_freq_adducts = adduct_freq[adduct_freq < threshold]
+        low_freq_percent = (low_freq_adducts * 100).round(2).astype(str) + '%'
+        print(f"\n频率 < {threshold*100}% 的 Adduct: \n{low_freq_percent.to_string()}")
+        
         # 过滤原始 DataFrame，仅保留有效 adduct 的行
         self.data = self.data[self.data["Adduct"].isin(valid_adducts)]
         self.data = self.data.reset_index(drop=True)
-        #print out all left adduct type
-        print(f"adduct_types:{len(valid_adducts)} \r\n{valid_adducts}")
+        self._plot_adduct_frequency(threshold,name='left')
+
+        # 打印保留的 adduct 类型（百分比格式）
+        valid_freq_percent = (adduct_freq[valid_adducts] * 100).round(2).astype(str) + '%'
+        print(f"\n保留的 Adduct 类型（共 {len(valid_adducts)} 种）: \n{valid_freq_percent.to_string()}")
+
+
+    def _plot_adduct_frequency(self, threshold=0.01, figsize=(10, 6),bar_hat=True,name='test'):
+        """
+        绘制 Adduct 频率的柱状图（从蓝到红的渐变颜色）
+        :param threshold: 频率阈值（小数形式，如 0.01 表示 1%）
+        :param figsize: 图像大小
+        """
+        # 计算频率
+        adduct_freq = self.data["Adduct"].value_counts(normalize=True)
+        adduct_freq_percent = adduct_freq * 100  # 转换为百分比
+
+        # 创建从 #5391f5（蓝）到 #ff1653（红）的渐变色
+        cmap = mcolors.LinearSegmentedColormap.from_list(
+            "blue_to_red", ["#5391f5", "#ff1653"]
+        )
+        
+        # 为每个柱体分配渐变色（按顺序）
+        colors = cmap(np.linspace(0, 1, len(adduct_freq)))
+
+        # 创建图像
+        plt.figure(figsize=figsize)
+        ax = plt.gca()  # 获取当前坐标轴
+        
+        # 绘制柱状图
+        bars = plt.bar(
+            adduct_freq_percent.index.astype(str),  # X 轴：Adduct 类型
+            adduct_freq_percent.values,             # Y 轴：频率百分比
+            color=colors,                           # 使用渐变色
+            edgecolor='black',                       # 边框颜色
+            # width=0.4,
+            alpha=0.8                               # 透明度
+        )
+         # 移除右边和上边的边框线
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        
+        # 添加阈值线（红色虚线）
+        plt.axhline(
+            y=threshold * 100,
+            color='red', 
+            linestyle='--', 
+            linewidth=1,
+            label=f'Threshold ({threshold*100:.1f}%)'
+        )
+        if bar_hat:
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(
+                    bar.get_x() + bar.get_width() / 2,  # X 位置（居中）
+                    height + 0.3,                        # Y 位置（略高于柱顶）
+                    f'{height:.1f}%',                    # 百分比标签
+                    ha='center',                         # 水平居中
+                    va='bottom'                          # 垂直对齐底部
+                )
+
+        # 设置标题和坐标轴
+        plt.title('Adduct Frequency Distribution (%)', fontsize=14, pad=20)
+        plt.xlabel('Adduct Type', fontsize=12)
+        plt.ylabel('Frequency (%)', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        plt.legend()
+        
+        # 调整布局并显示
+        plt.tight_layout()
+        plt.savefig("./"+name,dpi=500)
 
 
 class Data_reader_METLIN(Data_reader):
