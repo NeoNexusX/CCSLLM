@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-from data_pre import RESULTS_BASE_PATH,Final_MELTIN_PATH,FINAL_DATA_PATH,ORINGINAL_BASE_PATH
-from data_pre.data_module import Data_reader_METLIN,Data_reader_ALLCCS
+from data_prepare import RESULTS_BASE_PATH,Final_MELTIN_PATH,FINAL_DATA_PATH,ORINGINAL_BASE_PATH
+from data_prepare.data_module import Data_reader_METLIN,Data_reader_ALLCCS
 
 pd.set_option("display.max_rows", None)  # 显示所有行
 pd.set_option("display.max_columns", None)  # 显示所有列
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
         # final_data.data.rename(columns={'CCS_AVG':'CCS',"Molecule Name":"Name"},inplace=True)
         # final_data.data['Input'] = final_data.data['Name']
-        final_data.data.info()
+        # final_data.data.info()
         
         final_data.print_uniques()
         final_data.select_adduct_fre()

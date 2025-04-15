@@ -4,10 +4,11 @@ import torch
 import pytorch_lightning as pl
 from model.layers.main_layer import LightningModule
 from model.args import parse_args
-from data_pre.tokenizer import MolTranBertTokenizer
-from data_pre.data_loader import PropertyPredictionDataModule
+from data_prepare.tokenizer import MolTranBertTokenizer
+from data_prepare.data_loader import PropertyPredictionDataModule
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.utilities import seed
+from pytorch_lightning.callbacks import EarlyStopping
 
 def main():
     margs = parse_args()
@@ -55,7 +56,15 @@ def main():
         save_top_k=3,
         filename="best-model-{epoch:02d}-{CCS_test_r2:.4f}"
     )
- 
+
+    # early stop
+    early_stopping_callback = EarlyStopping(
+        monitor="CCS_test_loss",
+        patience=100,  # 10个epoch内没有改进就停止
+        verbose=True,
+        mode="min"    # 因为是监控loss，所以模式为min
+    )
+
     logger = TensorBoardLogger(
         save_dir=checkpoint_root,
         version=run_name,
@@ -99,7 +108,7 @@ def main():
         logger=logger,
         resume_from_checkpoint=resume_from_checkpoint,
         checkpoint_callback=checkpoint_callback,
-        callbacks = [r2_checkpoint_callback],
+        callbacks = [r2_checkpoint_callback, early_stopping_callback],
         num_sanity_val_steps=0,
     )
  

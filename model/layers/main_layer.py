@@ -70,7 +70,7 @@ class LightningModule(pl.LightningModule):
         self.loss = torch.nn.MSELoss()
         self.net = Head(config.n_embd,dropout=config.dropout)
 
-        if 'ATT' in self.config.project_name:
+        if 'Attention' in self.config.project_name:
             self.aggre = Aggre_Attention(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)
         elif 'Linear' in self.config.project_name:
             self.aggre = Aggre_Linear(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)

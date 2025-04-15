@@ -1,22 +1,22 @@
 python main.py \
         --device cuda \
-        --batch_size 60  \
+        --batch_size 32  \
         --n_head 12 \
         --n_layer 12 \
         --n_embd 768 \
         --d_dropout 0.0 \
         --dropout 0.0 \
-        --lr_start 1e-5 \
+        --lr_start 1e-6 \
         --num_workers 20\
         --max_epochs 1000 \
         --num_feats 32 \
         --checkpoint_every 10 \
         --seed_path './Pretrained MoLFormer/checkpoints/N-Step-Checkpoint_3_30000.ckpt' \
-        --dataset_name FD_A0 \
-        --data_root ./data/FD_A0 \
+        --dataset_name FD_M0 \
+        --data_root ./data/FD_M0 \
         --measure_name CCS \
-        --checkpoints_folder './Linear_Full_A0'\
-        --project_name 'Linear_Full_A0' \
-        --type 'early' \
-        --adduct_num 10 \
+        --checkpoints_folder './Attention_Full_M0'\
+        --project_name 'Attention_Full_M0' \
+        --type 'later' \
+        --adduct_num 3 \
         --ecfp_num 1024 \

@@ -12,7 +12,7 @@ import collections
 from rdkit.Chem import rdFingerprintGenerator
 import csv
 from pathlib import Path
-from data_pre.data_utils import calculate_ecfp_rdkit
+from data_prepare.data_utils import calculate_ecfp_rdkit
 
 
 torch.set_float32_matmul_precision('high')

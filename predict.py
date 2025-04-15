@@ -2,8 +2,8 @@ import torch
 import yaml
 from argparse import Namespace
 import numpy as np
-from data_pre.data_loader import PropertyPredictionDataModule
-from data_pre.tokenizer import MolTranBertTokenizer
+from data_prepare.data_loader import PropertyPredictionDataModule
+from data_prepare.tokenizer import MolTranBertTokenizer
 from model.layers.main_layer import LightningModule
 from fast_transformers.masking import LengthMask as LM
 import matplotlib.pyplot as plt
