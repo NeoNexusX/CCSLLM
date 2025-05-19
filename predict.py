@@ -7,7 +7,12 @@ from data_prepare.tokenizer import MolTranBertTokenizer
 from model.layers.main_layer import LightningModule
 from fast_transformers.masking import LengthMask as LM
 import matplotlib.pyplot as plt
-from sklearn import linear_model
+from sklearn.metrics import r2_score
+import pandas as pd
+from data_prepare.data_loader import ADDUCT2IDX
+
+
+IDX2ADDUCT = {v: k for k, v in ADDUCT2IDX.items()}
 
 def prepare_data(model_name):
 
@@ -54,34 +59,82 @@ def predict(batch):
         targets = batch[-1] # ccs
         device = "cuda"
         idx, mask, m_z, adduct, ecfp,targets = [x.to(device) for x in batch]
-        
+        # First, move idx back to CPU if it's on GPU
+
+        idx_cpu = idx.cpu()
+        # Decode each sequence in the batch
+        smiles_list = []
+        for seq in idx_cpu:
+            # Convert indices to tokens (automatically handles special tokens)
+            tokens = model.tokenizer.convert_ids_to_tokens(seq)
+            # Convert tokens to SMILES string
+            smiles = model.tokenizer.convert_tokens_to_string(tokens)
+            smiles_list.append(smiles)
+
         token_embeddings = model.tok_emb(idx) # each index maps to a (learnable) vector
         x = model.drop(token_embeddings)
         x = model.blocks(x, length_mask=LM(mask.sum(-1)))
-        token_embeddings = x
-        _ ,loss_input = model.aggre(x, m_z, adduct, ecfp,mask)
-        pred, actual = model.get_pred(loss_input, targets)
 
-    return pred.cpu().detach().numpy(),actual.cpu().detach().numpy()
+        if 'early' in model.hparams.type :
+
+            if 'hyperccs' in model.hparams.type:
+                _ ,x = model.aggre(x, m_z, adduct, ecfp, mask)
+
+            input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
+            # input_mask_expanded : [batch, seq_len, emb_dim]
+            masked_embedding = x * input_mask_expanded
+            # 对 mask 进行 使用
+            sum_embeddings = torch.sum(masked_embedding, 1)
+            # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
+            sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-7)
+            loss_input = sum_embeddings / sum_mask
+
+
+        elif model.hparams.type == 'later':
+            _ ,loss_input = model.aggre(x, m_z, adduct, ecfp, mask)
+
+        pred, actual = model.get_pred(loss_input, targets)
+        
+    return pred.cpu().detach().numpy().flatten(),actual.cpu().detach().numpy(),smiles_list,adduct.cpu().detach().numpy().flatten()
 
 
 if __name__ == '__main__':
-
-    model_name = 'ATT_FULL'
+    model_name = '[2M+Na]+]'
     model = prepare_model(model_name)
     model.eval()
     test_dataloader = prepare_data(model_name)
 
     pre_output = []
     truth = []
+    smiles = []
+    adducts = []
 
     for batch in test_dataloader:
-        pred,actual = predict(batch)
-        pre_output.extend([pred])
+        pred, actual, smile, adduct = predict(batch)
+        smiles.extend(smile)
+        adducts.extend(adduct)
+        pre_output.extend(pred)
         truth.extend(actual)
 
     y_hat = np.stack(pre_output)
     y = np.stack(truth)
+    adducts = [IDX2ADDUCT.get(adduct) for adduct in adducts ]
+    # Print shapes to verify
+    print("Shape of y:", y.shape)  # Should be (1104,)
+    print("Shape of y_hat:", y_hat.shape)  # Should be (1104,)
+    print("Shape of adducts:", len(adducts))  # Should be (1104,)
+    print("Shape of smiles:", len(smiles))  # Should be (1104,)
 
-    print(y_hat)
-    print(y)
+    # Calculate R² score
+    r2 = r2_score(y, y_hat)
+    print(f"R² score: {r2:.4f}")
+    
+    # Save results to CSV
+    results = pd.DataFrame({
+        'true_ccs': y,
+        'predicted_ccs': y_hat,
+        'smiles': smiles,
+        'adducts': adducts,
+    })
+    results.to_csv(f'predictions_{model_name}.csv', index=False)
+    print("Predictions saved to predictions.csv")

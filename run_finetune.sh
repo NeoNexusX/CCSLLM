@@ -1,12 +1,12 @@
 python main.py \
         --device cuda \
-        --batch_size 32  \
+        --batch_size 48  \
         --n_head 12 \
         --n_layer 12 \
         --n_embd 768 \
-        --d_dropout 0.0 \
+        --d_dropout 0.0\
         --dropout 0.0 \
-        --lr_start 1e-6 \
+        --lr_start 1e-5 \
         --num_workers 20\
         --max_epochs 1000 \
         --num_feats 32 \
@@ -15,8 +15,8 @@ python main.py \
         --dataset_name FD_M0 \
         --data_root ./data/FD_M0 \
         --measure_name CCS \
-        --checkpoints_folder './Attention_Full_M0'\
-        --project_name 'Attention_Full_M0' \
+        --checkpoints_folder './Attention_Nomz_NoECFP'\
+        --project_name 'Attention_M0_Nomz_NoECFP' \
         --type 'later' \
         --adduct_num 3 \
         --ecfp_num 1024 \

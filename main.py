@@ -60,7 +60,7 @@ def main():
     # early stop
     early_stopping_callback = EarlyStopping(
         monitor="CCS_test_loss",
-        patience=100,  # 10个epoch内没有改进就停止
+        patience=10,  # 10个epoch内没有改进就停止
         verbose=True,
         mode="min"    # 因为是监控loss，所以模式为min
     )

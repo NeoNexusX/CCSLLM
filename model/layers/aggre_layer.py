@@ -11,12 +11,13 @@ class Aggre_Attention(nn.Module):
                  smiles_embed_dim, 
                  ecfp_length=1024,
                  num_adducts=10,  # 根据实际离子类型数量调整
+                 mz_dim=1,
                  dropout=0.0):
         
         super().__init__()
         print(f"Initializing an instance of {self.__class__.__name__}")
 
-        mz_dim = smiles_embed_dim 
+        mz_dim = 0 if mz_dim ==0 else smiles_embed_dim 
         adduct_dim = smiles_embed_dim 
         ecfp_dim = 0 if ecfp_length == 0  else smiles_embed_dim
 
@@ -28,12 +29,16 @@ class Aggre_Attention(nn.Module):
         )
 
         # 数值特征处理
-        self.mz_net = nn.Sequential(
-            nn.Linear(1, mz_dim),
-            nn.LayerNorm(mz_dim),
-            nn.GELU(),
-            nn.Dropout(dropout)
-        )
+        if mz_dim == 0:
+            self.mz_net = None
+            print('self.mz_net is None')
+        else:
+            self.mz_net = nn.Sequential(
+                nn.Linear(1, mz_dim),
+                nn.LayerNorm(mz_dim),
+                nn.GELU(),
+                nn.Dropout(dropout)
+            )
         
         # 离子类型嵌入
         self.adduct_emb = nn.Embedding(num_adducts, adduct_dim)
@@ -47,6 +52,7 @@ class Aggre_Attention(nn.Module):
         # ECFP特征处理
         if ecfp_dim == 0 :
             self.ecfp_net = None
+            print('self.ecfp_net is None')
         else:
             self.ecfp_net = nn.Sequential(
                 nn.Linear(ecfp_length, ecfp_dim),
@@ -67,7 +73,14 @@ class Aggre_Attention(nn.Module):
         )
         
         # 最终融合层
-        total_dim = smiles_embed_dim * 3 if ecfp_length==0  else smiles_embed_dim * 4
+        if ecfp_length == 0 and mz_dim!= 0:
+            total_dim = smiles_embed_dim * 3
+        elif mz_dim == 0 and ecfp_length!= 0:
+            total_dim = smiles_embed_dim * 3
+        elif mz_dim == 0 and ecfp_length == 0 :
+            total_dim = smiles_embed_dim * 2
+        else:
+            total_dim = smiles_embed_dim * 4
 
         self.final_fusion = nn.Sequential(
             nn.Linear(total_dim, total_dim//2),
@@ -92,8 +105,9 @@ class Aggre_Attention(nn.Module):
         smiles_feat = torch.einsum('bsd,bs->bd', smiles_emb, attn_weights)  # [batch, embed_dim]
 
         # 数值特征处理
-        mz_feat = self.mz_net(m_z.unsqueeze(-1))  # [batch, mz_dim]
-        combined_list.append(mz_feat)
+        if self.mz_net:
+            mz_feat = self.mz_net(m_z.unsqueeze(-1))  # [batch, mz_dim]
+            combined_list.append(mz_feat)
         
         # 离子类型特征
         adduct_feat = self.adduct_net(self.adduct_emb(adduct))  # [batch, adduct_dim]
@@ -195,33 +209,34 @@ class Aggre_Linear(nn.Module):
     
 class Aggre_Abandoned(nn.Module):
         
-    def __init__(self,smiles_reflect_dim,ecfp_length=1024,num_adducts=3,dropout=0.1):
-        super().__init__()    
-        # 1. 对 `adduct`  'ecfp' 使用嵌入映射
-        self.emd_size =1024
-        self.adduct_emb = nn.Embedding(num_adducts, self.emd_size//2)
-        self.ecfp_emb = nn.Linear(ecfp_length, self.emd_size)
-        self.smiles_embedding_layer = nn.Linear(smiles_reflect_dim, self.emd_size)
+    def __init__(self, smiles_embed_dim, dropout=0.0):
+        super().__init__()
+        self.desc_skip_connection = True 
+        self.fcs = []  # nn.ModuleList()
+        print('dropout is {}'.format(dropout))
 
-    def forward(self, smiles_embedding ,m_z, adduct, ecfp, mask):
+        self.fc1 = nn.Linear(smiles_embed_dim, smiles_embed_dim)
+        self.dropout1 = nn.Dropout(dropout)
+        self.relu1 = nn.GELU()
+        self.fc2 = nn.Linear(smiles_embed_dim, smiles_embed_dim)
+        self.dropout2 = nn.Dropout(dropout)
+        self.relu2 = nn.GELU()
+        self.final = nn.Linear(smiles_embed_dim, 1)
 
-        # mask   [batch, length]
-        # m/z    [batch]
-        # adduct [batch] 
-        # ecfp   [batch, ecfp_length]
+    def forward(self, smiles_emb):
+        x_out = self.fc1(smiles_emb)
+        x_out = self.dropout1(x_out)
+        x_out = self.relu1(x_out)
 
-        adduct = self.adduct_emb(adduct)
-        # adduct: [batch,1]
+        if self.desc_skip_connection is True:
+            x_out = x_out + smiles_emb
 
-        ecfp = self.ecfp_emb(ecfp)
-        # [batch_size, 1]
+        z = self.fc2(x_out)
+        z = self.dropout2(z)
+        z = self.relu2(z)
+        if self.desc_skip_connection is True:
+            z = self.final(z + x_out)
+        else:
+            z = self.final(z)
 
-        m_z = m_z.unsqueeze(1).repeat(1,self.emd_size//2)
-        # [batch_size, 1]
-
-        smiles_embedding = self.smiles_embedding_layer(smiles_embedding)
-        # 汇聚堆叠在一起
-        
-        cat = torch.cat((ecfp,smiles_embedding,adduct,m_z),dim=1)
-
-        return cat
+        return z

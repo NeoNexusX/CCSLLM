@@ -12,7 +12,7 @@ from functools import partial
 from sklearn.metrics import r2_score
 from .head_layer import Head
 import pandas as pd
-from .aggre_layer import Aggre_Linear,Aggre_Attention
+from .aggre_layer import Aggre_Linear,Aggre_Attention,Aggre_Abandoned
 from apex import optimizers
 
 def append_to_file(filename, line):
@@ -36,7 +36,7 @@ class LightningModule(pl.LightningModule):
             self.hparams.measure_name + "min_epoch": 0,
         }
         # Word embeddings layer
-        # 字典，嵌入曾参数初始化？这里没用上
+        # 字典，嵌入参数初始化？这里没用上
         n_vocab, d_emb = len(tokenizer.vocab), config.n_embd
 
         # input embedding stem
@@ -66,7 +66,7 @@ class LightningModule(pl.LightningModule):
         self.train_config = config
 
         # -------------------------------------------------------------------------
-        # 默认使用了 L1 loss
+        # 默认使用了 MSELoss
         self.loss = torch.nn.MSELoss()
         self.net = Head(config.n_embd,dropout=config.dropout)
 
@@ -74,8 +74,8 @@ class LightningModule(pl.LightningModule):
             self.aggre = Aggre_Attention(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)
         elif 'Linear' in self.config.project_name:
             self.aggre = Aggre_Linear(config.n_embd,num_adducts=config.adduct_num,dropout=config.dropout,ecfp_length=config.ecfp_num)
-
-        self.max_r2 = 0.9
+        
+        self.max_r2 = 0.8
         
     class lm_layer(nn.Module):
 
@@ -217,8 +217,11 @@ class LightningModule(pl.LightningModule):
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
 
-        if self.hparams.type == 'early':
-            _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+        if 'early' in self.hparams.type :
+
+            if 'hyperccs' in self.hparams.type:
+                _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+
             input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
             # input_mask_expanded : [batch, seq_len, emb_dim]
             masked_embedding = x * input_mask_expanded
@@ -228,8 +231,10 @@ class LightningModule(pl.LightningModule):
             sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-7)
             loss_input = sum_embeddings / sum_mask
 
+
         elif self.hparams.type == 'later':
             _ ,loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
+
 
         loss, pred, actual = self.get_loss(loss_input, targets)
 
@@ -250,8 +255,11 @@ class LightningModule(pl.LightningModule):
         x = self.drop(token_embeddings)
         x = self.blocks(x, length_mask=LM(mask.sum(-1)))
 
-        if self.hparams.type == 'early':
-            _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+        if 'early' in self.hparams.type :
+
+            if 'hyperccs' in self.hparams.type:
+                _ ,x = self.aggre(x, m_z, adduct, ecfp,mask)
+
             input_mask_expanded = mask.unsqueeze(-1).expand(x.size()).float()
             # input_mask_expanded : [batch, seq_len, emb_dim]
             masked_embedding = x * input_mask_expanded
@@ -260,11 +268,11 @@ class LightningModule(pl.LightningModule):
             # 有效 token 的嵌入保留，无效 token 的嵌入变为 0，[batch, emb_dim]
             sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-7)
             loss_input = sum_embeddings / sum_mask
-            
+
         elif self.hparams.type == 'later':
             _ ,loss_input = self.aggre(x, m_z, adduct, ecfp,mask)
 
-        loss, pred, actual = self.get_loss(loss_input, targets)
+        loss, pred, actual = self.get_loss(loss_input, targets) 
 
         self.log('val_loss', loss, on_step=True)
         return {

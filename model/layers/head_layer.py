@@ -24,6 +24,26 @@ class Head(nn.Module):
         self.final = nn.Linear(fc3_out_emb, 1)
         self.activate4 = nn.GELU() if act=='GELU' else nn.ReLU()
     
+    def get_layerfc3(self,x):
+        x_out = self.fc1(x)
+        x_out = self.activate1(x_out)
+        x_out = self.dropout1(x_out)
+
+        if self.desc_skip_connection is True:
+            x_out = x_out + x
+
+        z = self.fc2(x_out)
+        z = self.activate2(z)
+
+        if self.desc_skip_connection is True:
+            z = self.fc3(z + x_out)
+        else:
+            z = self.fc3(z)
+
+        z = self.activate3(z)
+
+        return z
+    
     def forward(self, x):
 
         x_out = self.fc1(x)

@@ -20,6 +20,7 @@ torch.set_float32_matmul_precision('high')
 class MolecularDataset(Dataset):
     def __init__(self, data_df):
         self.data_df = data_df
+        self.data_df.info()
         print("Calculating ECFP features...")
         self.data_df['ecfp'] = self.data_df['smiles'].apply(calculate_ecfp_rdkit)
         self.data_df = self.data_df.dropna()
@@ -120,9 +121,9 @@ class CCSPredictionModel(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.00001)
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.0001)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-6
+            optimizer, mode='min', factor=0.1, patience=10, min_lr=1e-4
         )
         return {
             "optimizer": optimizer,
@@ -150,16 +151,16 @@ def train_model(train_path, val_path, test_path, save_dir='checkpoints'):
     trainer = pl.Trainer(
         max_epochs=500,
         accelerator='gpu',
-        devices=1,
+        devices=[3],
         precision=32,
         callbacks=[
             pl.callbacks.EarlyStopping(
                 monitor='val_loss',
-                patience=20,
+                patience=10,
                 min_delta=0.01,
                 mode='min'
             ),
-            pl.callbacks.ModelCheckpoint(
+           pl.callbacks.ModelCheckpoint(
                 dirpath=save_dir,
                 filename='ccs_model-{epoch:02d}-{val_loss:.2f}',
                 monitor='val_loss',
@@ -179,10 +180,10 @@ def train_model(train_path, val_path, test_path, save_dir='checkpoints'):
     return model, trainer
 
 if __name__ == "__main__":
-    data_path = 'data/FD_A1/'
+    data_path = 'data/FD_M0/'
     model, trainer = train_model(
-        train_path= data_path +'FD_A1_train.csv',
-        val_path= data_path + 'FD_A1_valid.csv',
-        test_path= data_path + 'FD_A1_test.csv',
+        train_path= data_path +'FD_M0_train.csv',
+        val_path= data_path + 'FD_M0_valid.csv',
+        test_path= data_path + 'FD_M0_test.csv',
         save_dir='./ECFPLinear'
     )
